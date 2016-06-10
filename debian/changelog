@@ -1,0 +1,5 @@
+nagios-plugins-openshift (0.1) trusty; urgency=low
+
+  * Initial release.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Fri, 10 Jun 2016 10:56:36 +0200

@@ -1,0 +1,91 @@
+#!/bin/bash
+
+set -e -u -o pipefail
+
+usage() {
+  echo "Usage: $0 -f <path> -s <server>:<port> -t <token>"
+  echo
+  echo 'Write a client configuration file for OpenShift monitoring.'
+  echo
+  echo 'Options:'
+  echo ' -f   Config file path'
+  echo ' -s   Address and port of the OpenShift API server'
+  echo ' -t   Bearer token for authentication'
+}
+
+opt_cfgfile=
+opt_server=
+opt_token=
+
+while getopts 'hf:s:t:' opt; do
+  case "$opt" in
+    h)
+      usage
+      exit 0
+      ;;
+    f) opt_cfgfile="$OPTARG" ;;
+    s) opt_server="$OPTARG" ;;
+    t) opt_token="$OPTARG" ;;
+    *)
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+shift $((OPTIND - 1))
+
+if [[ "$#" -gt 0 ]]; then
+  usage >&2
+  exit 1
+fi
+
+if [[ -z "$opt_cfgfile" ]]; then
+  usage >&2
+  exit 1
+fi
+
+if [[ -z "$opt_server" || "$opt_server" != *:* ]]; then
+  usage >&2
+  exit 1
+fi
+
+if [[ -z "$opt_token" || "${#opt_token}" -lt 10 ]]; then
+  usage >&2
+  exit 1
+fi
+
+make_nickname() {
+  # Convert to lowercase
+  local lc=${1,,*}
+
+  # Strip unwanted characters
+  echo "${lc//[^0-9a-zA-Z]/}"
+}
+
+user_nickname=cred-$(make_nickname "$opt_server")
+cluster_nickname=cluster-$(make_nickname "$opt_server")
+context_nickname="ctx-$cluster_nickname-$user_nickname"
+
+/usr/bin/oc --config="$opt_cfgfile" config set-credentials \
+  "$user_nickname" \
+  --token="$opt_token" \
+  --username= \
+  --password=
+
+/usr/bin/oc --config="$opt_cfgfile" config set-cluster \
+  "$cluster_nickname" \
+  --server="$opt_server" \
+  --api-version= \
+  --insecure-skip-tls-verify=false
+
+/usr/bin/oc --config="$opt_cfgfile" config set-context \
+  "$context_nickname" \
+  --cluster="$cluster_nickname" \
+  --user="$user_nickname" \
+  --namespace=
+
+/usr/bin/oc --config="$opt_cfgfile" config use-context \
+  "$context_nickname"
+
+# vim: set sw=2 sts=2 et :

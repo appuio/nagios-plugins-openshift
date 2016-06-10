@@ -1,0 +1,12 @@
+Source: nagios-plugins-openshift
+Section: net
+Priority: optional
+Maintainer: Michael Hanselmann <hansmi@vshn.ch>
+Build-Depends: debhelper (>= 8.0.0)
+Standards-Version: 3.9.5
+Homepage: https://git.vshn.net/vshn/nagios-plugins-openshift
+
+Package: nagios-plugins-openshift
+Architecture: all
+Depends: ${misc:Depends}, bash, openshift-origin-client-tools, jq
+Description: Nagios-compatible plugins to monitor OpenShift

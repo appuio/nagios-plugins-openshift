@@ -1,0 +1,88 @@
+#!/bin/bash
+
+set -e -u -o pipefail
+
+. /usr/lib/nagios-plugins-openshift/utils
+
+usage() {
+  echo "Usage: $0 -f <path> -n <node>"
+  echo
+  echo 'Options:'
+  echo ' -f   Config file path'
+  echo ' -n   Node name'
+}
+
+opt_cfgfile=
+opt_name=
+
+while getopts 'hf:n:' opt; do
+  case "$opt" in
+    h)
+      usage
+      exit 0
+      ;;
+    f) opt_cfgfile="$OPTARG" ;;
+    n) opt_name="$OPTARG" ;;
+    *)
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+shift $((OPTIND - 1))
+
+if [[ "$#" -gt 0 ]]; then
+  usage >&2
+  exit 1
+fi
+
+if [[ -z "$opt_cfgfile" || -z "$opt_name" ]]; then
+  usage >&2
+  exit 1
+fi
+
+tmpdir=$(mktemp -d)
+trap "rm -rf $tmpdir" EXIT
+
+if ! msg=$(run_oc "$opt_cfgfile" get node "$opt_name" 2>&1 >$tmpdir/node.json); then
+  echo "$msg"
+  exit $state_critical
+fi
+
+exit_status=$state_ok
+output=()
+
+get_condition() {
+  local name="$1"
+
+  jq -r ".status.conditions[] | select(.type == \"$name\") | [.status, .message] | @sh"
+}
+
+check_condtion() {
+  local cond="$1"
+  local expected="$2"
+  local values
+
+  if values=$(get_condition "$cond" < $tmpdir/node.json); then
+    eval "set -- $values"
+
+    local status_lc="${1,,*}"
+    local msg="$2"
+
+    if [[ "$status_lc" != "$expected" ]]; then
+      output+=( "condition \"$cond\": $msg" )
+      exit_status=$(merge_status $exit_status $state_critical)
+    fi
+  else
+    output+=( "missing \"$cond\" condition" )
+    exit_status=$(merge_status $exit_status $state_critical)
+  fi
+}
+
+check_condtion Ready true
+check_condtion OutOfDisk false
+
+finish "$exit_status" ${output:+"${output[@]}"}
+
+# vim: set sw=2 sts=2 et :

@@ -1,0 +1,3 @@
+check_* usr/lib/nagios/plugins
+utils usr/lib/nagios-plugins-openshift
+write-config usr/lib/nagios-plugins-openshift
