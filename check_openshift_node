@@ -83,6 +83,8 @@ check_condtion() {
 check_condtion Ready true
 check_condtion OutOfDisk false
 
-finish "$exit_status" ${output:+"${output[@]}"}
+finish "$exit_status" \
+  "$(join_args ', ' ${output[@]+"${output[@]}"})" \
+  ''
 
 # vim: set sw=2 sts=2 et :

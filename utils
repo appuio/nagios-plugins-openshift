@@ -49,32 +49,36 @@ run_oc() {
   /usr/bin/oc --config="$cfgfile" -o json "$@"
 }
 
+#
+# Print result in Nagios-compatible format and terminate process
+#
+# Arguments:
+# - exit_status: Status code
+# - output: Human-readable output
+# - metrics: Metrics for Nagios-compatible monitoring systems
+#
 finish() {
-  local exit_status="$1"; shift
-  local output=( "$@" )
-  local combined
+  local exit_status="$1"
+  local output="$2"
+  local metrics="$3"
+  local prefix=UNKNOWN
 
   case "$exit_status" in
     $state_ok)
-      combined=OK
+      prefix=OK
       ;;
     $state_warning)
-      combined=WARNING
+      prefix=WARNING
       ;;
     $state_critical)
-      combined=CRITICAL
+      prefix=CRITICAL
       ;;
     *)
-      combined=UNKNOWN
       exit_status=$state_unknown
       ;;
   esac
 
-  if [[ -v output && "${#output[@]}" -gt 0 ]]; then
-    combined="$combined $(join_args ', ' "${output[@]}")"
-  fi
-
-  echo "$combined"
+  echo "$prefix${output:+ $output}${metrics:+ | $metrics}"
   exit $exit_status
 }
 
