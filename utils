@@ -16,8 +16,12 @@ readonly state_unknown=3
 #
 join_args() {
   local delim="$1"; shift
-  echo -n "$1"; shift
-  printf "%s" "${@/#/$delim}"
+  if [[ "$#" -gt 0 ]]; then
+    echo -n "$1"; shift
+    if [[ "$#" -gt 0 ]]; then
+      printf "%s" "${@/#/$delim}"
+    fi
+  fi
 }
 
 #
