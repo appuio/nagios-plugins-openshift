@@ -1,0 +1,93 @@
+#!/bin/bash
+
+set -e -u -o pipefail
+
+. /usr/lib/nagios-plugins-openshift/utils
+
+default_namespace=default
+
+usage() {
+  echo "Usage: $0 -f <path> [-n <namespace>] [-s <selector>] [-w <number>] [-c <number>]"
+  echo
+  echo 'Options:'
+  echo ' -f   Config file path'
+  echo " -n   Namespace (default: \"$default_namespace\")"
+  echo ' -s   Selector, e.g. "deploymentconfig=foobar"'
+  echo ' -c   Minimum number of running pods'
+  echo ' -w   Emit warning if the number of running pods is less than the given number'
+}
+
+opt_cfgfile=
+opt_namespace=$default_namespace
+opt_selector=
+opt_warn=
+opt_crit=
+
+while getopts 'hf:n:s:w:c:' opt; do
+  case "$opt" in
+    h)
+      usage
+      exit 0
+      ;;
+    f) opt_cfgfile="$OPTARG" ;;
+    n) opt_namespace="$OPTARG" ;;
+    s) opt_selector="$OPTARG" ;;
+    w) opt_warn="$OPTARG" ;;
+    c) opt_crit="$OPTARG" ;;
+    *)
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+shift $((OPTIND - 1))
+
+if [[ "$#" -gt 0 ]]; then
+  usage >&2
+  exit 1
+fi
+
+if [[ -z "$opt_cfgfile" ]]; then
+  usage >&2
+  exit 1
+fi
+
+tmpfile=$(mktemp)
+trap "rm -f $tmpfile" EXIT
+
+if ! msg=$(run_oc "$opt_cfgfile" get pod \
+             --output=json \
+             --namespace="$opt_namespace" \
+             --selector="$opt_selector" \
+             2>&1 >$tmpfile); then
+  echo "$msg"
+  exit $state_critical
+fi
+
+count_ready() {
+  jq -r \
+    '[.items[].status |
+      select(.conditions[] | select(.type == "Ready") | .status == "True")
+     ] | length'
+}
+
+count=$(count_ready < $tmpfile)
+
+if [[ -n "$opt_crit" && "$count" -le "$opt_crit" ]]; then
+  output="$count of a minimum of $opt_crit pods running"
+  exit_status=$state_critical
+elif [[ -n "$opt_warn" && "$count" -le "$opt_warn" ]]; then
+  output="$count pods running, at least $opt_warn desired"
+  exit_status=$state_warning
+else
+  output="$count pods running"
+  exit_status=$state_ok
+fi
+
+# http://docs.icinga.org/latest/en/perfdata.html#perfdata-format
+metrics="count=${count};${opt_warn};${opt_crit}"
+
+finish "$exit_status" "$output" "$metrics"
+
+# vim: set sw=2 sts=2 et :

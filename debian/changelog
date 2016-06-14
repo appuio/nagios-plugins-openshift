@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.2) trusty; urgency=medium
+
+  * Add script to monitor number of running pods given a namespace and
+    selector.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Tue, 14 Jun 2016 18:13:47 +0200
+
 nagios-plugins-openshift (0.1) trusty; urgency=low
 
   * Initial release.
