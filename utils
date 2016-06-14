@@ -46,7 +46,10 @@ merge_status() {
 run_oc() {
   local cfgfile="$1"; shift
 
-  /usr/bin/oc --config="$cfgfile" "$@"
+  /usr/bin/oc \
+    --config="$cfgfile" \
+    --namespace=default \
+    "$@"
 }
 
 #
