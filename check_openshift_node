@@ -59,7 +59,7 @@ get_condition() {
   jq -r ".status.conditions[] | select(.type == \"$name\") | [.status, .message] | @sh"
 }
 
-check_condtion() {
+check_condition() {
   local cond="$1"
   local expected="$2"
   local values
@@ -80,8 +80,8 @@ check_condtion() {
   fi
 }
 
-check_condtion Ready true
-check_condtion OutOfDisk false
+check_condition Ready true
+check_condition OutOfDisk false
 
 finish "$exit_status" \
   "$(join_args ', ' ${output[@]+"${output[@]}"})" \
