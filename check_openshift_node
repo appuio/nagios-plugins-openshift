@@ -45,7 +45,7 @@ fi
 tmpdir=$(mktemp -d)
 trap "rm -rf $tmpdir" EXIT
 
-if ! msg=$(run_oc "$opt_cfgfile" get node "$opt_name" 2>&1 >$tmpdir/node.json); then
+if ! msg=$(run_oc "$opt_cfgfile" get --output=json node "$opt_name" 2>&1 >$tmpdir/node.json); then
   echo "$msg"
   exit $state_critical
 fi
