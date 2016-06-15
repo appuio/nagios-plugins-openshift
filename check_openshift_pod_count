@@ -66,6 +66,8 @@ if ! msg=$(run_oc "$opt_cfgfile" get pod \
 fi
 
 count_ready() {
+  # Data structure documentation:
+  # https://godoc.org/k8s.io/kubernetes/pkg/api/v1>
   jq -r \
     '[.items[].status |
       select(.conditions[] | select(.type == "Ready") | .status == "True")
