@@ -9,6 +9,9 @@ default_namespace=default
 usage() {
   echo "Usage: $0 -f <path> [-n <namespace>] [-s <selector>] [-w <number>] [-c <number>]"
   echo
+  echo 'Check the number of pods reported as ready (see OpenShift documentation).'
+  echo 'A selector may be used to restrict the pods taken into consideration.'
+  echo
   echo 'Options:'
   echo ' -f   Config file path'
   echo " -n   Namespace (default: \"$default_namespace\")"
