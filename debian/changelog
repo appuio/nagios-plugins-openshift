@@ -1,3 +1,9 @@
+nagios-plugins-openshift (0.3) trusty; urgency=medium
+
+  * Add script to monitor timestamp of last per-machine timestamp in Hawkular.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Fri, 24 Jun 2016 17:45:02 +0200
+
 nagios-plugins-openshift (0.2) trusty; urgency=medium
 
   * Add script to monitor number of running pods given a namespace and

@@ -2,11 +2,20 @@ Source: nagios-plugins-openshift
 Section: net
 Priority: optional
 Maintainer: Michael Hanselmann <hansmi@vshn.ch>
-Build-Depends: debhelper (>= 8.0.0)
+Build-Depends: debhelper (>= 8.0.0),
+ python3,
+ python3-setuptools,
+ dh-python
 Standards-Version: 3.9.5
+X-Python3-Version: >= 3.4
 Homepage: https://git.vshn.net/vshn/nagios-plugins-openshift
 
 Package: nagios-plugins-openshift
 Architecture: all
-Depends: ${misc:Depends}, bash, openshift-origin-client-tools, jq
+Depends: ${misc:Depends}, ${python3:Depends}, bash,
+ openshift-origin-client-tools,
+ jq,
+ python3 (>= 3.4),
+ python3-nagiosplugin (>= 1.2),
+ python3-requests (>= 2.2)
 Description: Nagios-compatible plugins to monitor OpenShift
