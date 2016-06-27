@@ -116,8 +116,7 @@ class HawkularClient(object):
           continue
         raise
 
-      if req.status_code == 204:
-        # No content
+      if req.status_code == requests.codes.no_content:
         return None
 
       # Important: Only certain verbs are idempotent in HTTP, one of them being
