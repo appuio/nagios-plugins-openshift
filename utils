@@ -46,6 +46,8 @@ merge_status() {
 run_oc() {
   local cfgfile="$1"; shift
 
+  # See https://github.com/openshift/origin/issues/9581
+  HOME=/ \
   /usr/bin/oc \
     --config="$cfgfile" \
     --namespace=default \

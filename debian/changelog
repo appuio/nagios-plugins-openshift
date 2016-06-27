@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.5) trusty; urgency=medium
+
+  * Set HOME while running "oc". See
+    <https://github.com/openshift/origin/issues/9581>.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Mon, 27 Jun 2016 11:27:30 +0200
+
 nagios-plugins-openshift (0.4) trusty; urgency=medium
 
   * Use server-provided date header for timestamp age calculations.
