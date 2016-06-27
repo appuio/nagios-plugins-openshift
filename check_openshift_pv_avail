@@ -1,0 +1,219 @@
+#!/bin/bash
+
+set -e -u -o pipefail
+
+. /usr/lib/nagios-plugins-openshift/utils
+
+usage() {
+  echo "Usage: $0 -f <path> [-w <warn>] [-c <crit>]"
+  echo '          [-l <label>=<value> [-w <warn>] [-c <crit>] ...]'
+  echo
+  echo 'Options:'
+  echo ' -f   Config file path'
+  echo ' -w   Exit with WARNING status if fewer physical volumes than the number'
+  echo '      given are available'
+  echo ' -c   Exit with CRITICAL status if fewer physical volumes than the number'
+  echo '      given are available'
+  echo ' -l   The following limits apply to the given label and value (limits may'
+  echo '      be unset)'
+  echo
+  echo 'Examples:'
+  echo " $0 -w 10"
+  echo "    Warn if fewer than 10 volumes are available"
+  echo " $0 -c 33 -l customer=foocorp -w 50"
+  echo '    Count volumes with the label "customer" set to "foocorp" separately and'
+  echo '    warn if less than 50 are available. Fail if less than 33 volumes without'
+  echo '    said label value are available.'
+}
+
+opt_cfgfile=
+opt_label=
+opt_warn=
+opt_crit=
+
+limits=()
+default_limits=
+
+push_limit() {
+  local labelval="$1"; shift
+  local joined=$(join_args ';' "$@")
+
+  if [[ -z "$labelval" ]]; then
+    default_limits="$joined"
+  else
+    limits+=( "$labelval;$joined" )
+  fi
+}
+
+while getopts 'hf:w:c:l:' opt; do
+  case "$opt" in
+    h)
+      usage
+      exit 0
+      ;;
+    f) opt_cfgfile="$OPTARG" ;;
+    w) opt_warn="$OPTARG" ;;
+    c) opt_crit="$OPTARG" ;;
+    l)
+      if [[ "$OPTARG" != ?*=* ]]; then
+        echo 'Label must be at least one character followed by an equal sign' \
+          'and a value' >&2
+        exit $state_critical
+      fi
+      push_limit "$opt_label" "$opt_warn" "$opt_crit"
+      opt_label="$OPTARG"
+      opt_warn=
+      opt_crit=
+      ;;
+    *)
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+push_limit "$opt_label" "$opt_warn" "$opt_crit"
+
+shift $((OPTIND - 1))
+
+if [[ "$#" -gt 0 ]]; then
+  usage >&2
+  exit 1
+fi
+
+if [[ -z "$opt_cfgfile" ]]; then
+  usage >&2
+  exit 1
+fi
+
+tmpdir=$(mktemp -d)
+trap "rm -rf $tmpdir" EXIT
+
+if ! msg=$(run_oc "$opt_cfgfile" get --output=json persistentvolumes 2>&1 >$tmpdir/pv.json); then
+  echo "$msg"
+  exit $state_critical
+fi
+
+exit_status=$state_ok
+output=()
+metrics=()
+
+#
+# Select volumes from a v1.PersistentVolumeList
+# https://docs.openshift.com/enterprise/3.2/rest_api/kubernetes_v1.html#v1-persistentvolumelist
+#
+# Arguments:
+# - labelval: Empty string to select all volumes or "label=value" to select
+#     volumes with given label set to given value
+# - *args: Volume UIDs to exclude
+#
+filter_volumes() {
+  local labelval="$1"; shift
+  local label= value=
+  local uidfilter=
+
+  for uid; do
+    if [[ -n "$uidfilter" ]]; then
+      uidfilter+=' and '
+    fi
+
+    uidfilter+=".metadata.uid != \"$uid\""
+  done
+
+  jqfilter='[.items[]'
+  if [[ -n "$uidfilter" ]]; then
+    jqfilter+=" | select($uidfilter)"
+  fi
+  if [[ -n "$labelval" ]]; then
+    IFS='=' read label value <<< "$labelval"
+    jqfilter+=" | select(.metadata.labels | .[\"$label\"] == \"$value\")"
+  fi
+  jqfilter+=']'
+
+  jq -r "$jqfilter"
+}
+
+#
+# Extract UIDs from a list of objects with v1.ObjectMeta
+# https://docs.openshift.com/enterprise/3.2/rest_api/kubernetes_v1.html#v1-objectmeta
+#
+get_obj_uids() {
+  jq -r '.[] | .metadata.uid | @text'
+}
+
+#
+# Count volumes (v1.PersistentVolume) grouped by capacity
+#
+calc_stats() {
+  jq -r '
+    group_by(.spec.capacity.storage) |
+    map({
+      capacity: .[0].spec.capacity.storage,
+      total: length,
+      avail: [.[] | select(.status.phase == "Available")] | length,
+    }) |
+    sort_by(.capacity) |
+    .[] |
+    @sh "capacity=\(.capacity) total=\(.total) avail=\(.avail)"
+  '
+}
+
+#
+# Apply user-provided limits and calculate metrics
+#
+check() {
+  local labelval="$1" warn="$2" crit="$3"
+  local status
+
+  calc_stats > $tmpdir/stats.txt
+
+  while read line; do
+    eval "local $line"
+
+    used=$(( $total - $avail ))
+
+    # http://docs.icinga.org/latest/en/perfdata.html#perfdata-format
+    metrics+=( "'${labelval:+${labelval//=/-}-}$capacity'=${used};${warn};${crit};0;${total}" )
+
+    if [[ -n "$crit" && $total -lt "$crit" ]]; then
+      status=$state_critical
+    elif [[ -n "$warn" && $total -lt "$warn" ]]; then
+      status=$state_warning
+    else
+      status=$state_ok
+    fi
+
+    if [[ "$status" != $state_ok ]]; then
+      output+=( "${labelval:+[$labelval] }$avail of $total volumes with $capacity available" )
+    fi
+
+    exit_status=$(merge_status $exit_status $status)
+  done < $tmpdir/stats.txt
+}
+
+processed=()
+
+for line in ${limits[@]+"${limits[@]}"}; do
+  IFS=';' read labelval warn crit _ <<< "$line"
+
+  # Find matching disks
+  filter_volumes "$labelval" ${processed[@]+"${processed[@]}"} \
+    < $tmpdir/pv.json > $tmpdir/matching.json
+
+  processed+=( $(get_obj_uids < $tmpdir/matching.json) )
+
+  check "$labelval" "$warn" "$crit" < $tmpdir/matching.json
+done
+
+# Process remaining volumes, i.e. those not explicitly requested by label value
+filter_volumes '' ${processed[@]+"${processed[@]}"} \
+  < $tmpdir/pv.json > $tmpdir/matching.json
+
+IFS=';' read warn crit _ <<< "$default_limits"
+check '' "$warn" "$crit" < $tmpdir/matching.json
+
+finish "$exit_status" \
+  "$(join_args ', ' ${output[@]+"${output[@]}"})" \
+  "${metrics[*]+${metrics[*]}}"
+
+# vim: set sw=2 sts=2 et :

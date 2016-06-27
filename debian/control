@@ -14,7 +14,8 @@ Package: nagios-plugins-openshift
 Architecture: all
 Depends: ${misc:Depends}, ${python3:Depends}, bash,
  openshift-origin-client-tools,
- jq,
+# jq 1.4 fixes https://github.com/stedolan/jq/issues/208
+ jq (>= 1.4),
  python3 (>= 3.4),
  python3-nagiosplugin (>= 1.2),
  python3-requests (>= 2.2)

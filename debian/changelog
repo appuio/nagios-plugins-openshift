@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.6) trusty; urgency=medium
+
+  * Add "check_openshift_pv_avail" to check number of available persistent
+    volumes.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Mon, 27 Jun 2016 18:00:30 +0200
+
 nagios-plugins-openshift (0.5) trusty; urgency=medium
 
   * Set HOME while running "oc". See
