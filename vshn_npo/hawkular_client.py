@@ -4,6 +4,8 @@ import logging
 import requests
 import time
 import urllib.parse
+import collections
+from email.utils import parsedate_tz, mktime_tz
 
 
 # Retry request if one of these status codes was received
@@ -23,6 +25,29 @@ def idquote(text):
 
 def _format_tags(tags):
   return ','.join("{}:{}".format(key, val) for (key, val) in tags.items())
+
+
+
+class Response(collections.namedtuple("Response", [
+  "data",
+  "server_time",
+  ])):
+  @classmethod
+  def from_request(cls, req):
+    if req.status_code == requests.codes.no_content:
+      data = None
+    else:
+      data = req.json()
+
+    raw_date = req.headers.get("Date", None)
+
+    if raw_date:
+      # See https://stackoverflow.com/a/26435566
+      timestamp = mktime_tz(parsedate_tz(raw_date))
+    else:
+      timestamp = None
+
+    return cls(data=data, server_time=timestamp)
 
 
 class HawkularClient(object):
@@ -116,9 +141,6 @@ class HawkularClient(object):
           continue
         raise
 
-      if req.status_code == requests.codes.no_content:
-        return None
-
       # Important: Only certain verbs are idempotent in HTTP, one of them being
       # GET. That must be taken into consideration should this code ever be
       # extended for other verbs.
@@ -129,7 +151,7 @@ class HawkularClient(object):
       # All other issues are fatal
       req.raise_for_status()
 
-      return req.json()
+      return Response.from_request(req)
 
     # This should never be reached
     raise Exception("Request failed after %s attempts", self._retries)

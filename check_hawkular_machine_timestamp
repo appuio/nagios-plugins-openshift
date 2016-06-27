@@ -26,41 +26,48 @@ class Timestamp(nagiosplugin.Resource):
         "start": str(int(start * 1000)),
         }
 
-    data = self._client.get("counters/{}/data".format(idquote(metric_id)),
-                            params=params)
+    response = self._client.get("counters/{}/data".format(idquote(metric_id)),
+                                params=params)
 
-    if data:
+    if response.data:
       # Get the most recent timestamp
       try:
-        timestamp = max(i["timestamp"] for i in data)
+        timestamp = max(i["timestamp"] for i in response.data)
       except (IndexError, KeyError) as err:
         raise nagiosplugin.CheckError("Data format not supported: %r" % (data, ))
 
-      return int(timestamp / 1000)
+      if response.server_time is None:
+        # Wrong or no date header from server; use local time
+        server_time = self._now
+      else:
+        # Calculate age relative to time on server
+        server_time = response.server_time
+
+      return (server_time, (timestamp / 1000))
 
     return None
 
   def probe(self):
-    length = self._now - self._start
-
-    if length > (1.2 * 70):
+    if (self._now - self._start) > (1.2 * 70):
       # Try a smaller query first; the value was likely updated in the last
       # minute
-      timestamp = self._query(self._now - 70)
+      result = self._query(self._now - 70)
     else:
-      timestamp = None
+      result = None
 
-    if timestamp is None:
-      timestamp = self._query(self._start)
+    if result is None:
+      result = self._query(self._start)
 
-    yield nagiosplugin.Metric("timestamp", timestamp, context="timestamp")
+    yield nagiosplugin.Metric("timestamp", result, context="timestamp")
 
 
 def format_timestamp_metric(start, metric, _):
   if metric.value is None:
     return "No data since at least {}".format(time.ctime(start))
 
-  return "updated at {}".format(time.ctime(metric.value))
+  (_, timestamp) = metric.value
+
+  return "updated at {}".format(time.ctime(timestamp))
 
 
 class TimestampContext(nagiosplugin.Context):
@@ -77,7 +84,9 @@ class TimestampContext(nagiosplugin.Context):
     if metric.value is None:
       return self.result_cls(nagiosplugin.Critical, metric=metric)
 
-    age = self._now - metric.value
+    (server_time, timestamp) = metric.value
+
+    age = server_time - timestamp
 
     hint = "%0.0f seconds ago" % (age, )
 
