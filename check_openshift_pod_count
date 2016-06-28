@@ -35,8 +35,14 @@ while getopts 'hf:n:s:w:c:' opt; do
     f) opt_cfgfile="$OPTARG" ;;
     n) opt_namespace="$OPTARG" ;;
     s) opt_selector="$OPTARG" ;;
-    w) opt_warn="$OPTARG" ;;
-    c) opt_crit="$OPTARG" ;;
+    w)
+      validate_integer "$OPTARG"
+      opt_warn="$OPTARG"
+      ;;
+    c)
+      validate_integer "$OPTARG"
+      opt_crit="$OPTARG"
+      ;;
     *)
       usage >&2
       exit 1

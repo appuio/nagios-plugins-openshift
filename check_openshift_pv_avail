@@ -53,8 +53,14 @@ while getopts 'hf:w:c:l:' opt; do
       exit 0
       ;;
     f) opt_cfgfile="$OPTARG" ;;
-    w) opt_warn="$OPTARG" ;;
-    c) opt_crit="$OPTARG" ;;
+    w)
+      validate_integer "$OPTARG"
+      opt_warn="$OPTARG"
+      ;;
+    c)
+      validate_integer "$OPTARG"
+      opt_crit="$OPTARG"
+      ;;
     l)
       if [[ "$OPTARG" != ?*=* ]]; then
         echo 'Label must be at least one character followed by an equal sign' \
@@ -176,9 +182,9 @@ check() {
     # http://docs.icinga.org/latest/en/perfdata.html#perfdata-format
     metrics+=( "'${labelval:+${labelval//=/-}-}$capacity'=${used};${warn};${crit};0;${total}" )
 
-    if [[ -n "$crit" && $total -lt "$crit" ]]; then
+    if [[ -n "$crit" && "$total" -lt "$crit" ]]; then
       status=$state_critical
-    elif [[ -n "$warn" && $total -lt "$warn" ]]; then
+    elif [[ -n "$warn" && "$total" -lt "$warn" ]]; then
       status=$state_warning
     else
       status=$state_ok
