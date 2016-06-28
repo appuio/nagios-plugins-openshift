@@ -1,3 +1,11 @@
+nagios-plugins-openshift (0.7) trusty; urgency=medium
+
+  * Ensure values for "-w" and "-c" are integers in check_openshift_pod_count
+    and check_openshift_pv_avail.
+  * Clarified the function of "-l" for check_openshift_pv_avail.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Tue, 28 Jun 2016 13:46:46 +0200
+
 nagios-plugins-openshift (0.6) trusty; urgency=medium
 
   * Add "check_openshift_pv_avail" to check number of available persistent
