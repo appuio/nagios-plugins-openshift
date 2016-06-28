@@ -15,7 +15,8 @@ usage() {
   echo ' -c   Exit with CRITICAL status if fewer physical volumes than the number'
   echo '      given are available'
   echo ' -l   The following limits apply to the given label and value (limits may'
-  echo '      be unset)'
+  echo '      be unset); matching volumes are not considered for the generic or any'
+  echo '      label-specific limits specified later (i.e. the first match applies)'
   echo
   echo 'Examples:'
   echo " $0 -w 10"
