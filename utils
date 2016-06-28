@@ -51,9 +51,9 @@ merge_status() {
   local cur="$1" update="$2"
 
   if (( cur < update )); then
-    echo $update
+    echo "$update"
   else
-    echo $cur
+    echo "$cur"
   fi
 }
 
@@ -98,7 +98,7 @@ finish() {
   esac
 
   echo "$prefix${output:+ $output}${metrics:+ | $metrics}"
-  exit $exit_status
+  exit "$exit_status"
 }
 
 # vim: set sw=2 sts=2 et :

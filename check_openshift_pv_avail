@@ -65,7 +65,7 @@ while getopts 'hf:w:c:l:' opt; do
       if [[ "$OPTARG" != ?*=* ]]; then
         echo 'Label must be at least one character followed by an equal sign' \
           'and a value' >&2
-        exit $state_critical
+        exit "$state_critical"
       fi
       push_limit "$opt_label" "$opt_warn" "$opt_crit"
       opt_label="$OPTARG"
@@ -94,11 +94,13 @@ if [[ -z "$opt_cfgfile" ]]; then
 fi
 
 tmpdir=$(mktemp -d)
-trap "rm -rf $tmpdir" EXIT
+trap 'rm -rf "$tmpdir"' EXIT
 
-if ! msg=$(run_oc "$opt_cfgfile" get --output=json persistentvolumes 2>&1 >$tmpdir/pv.json); then
+# Capture stderr in variable and redirect stdout to file
+# shellcheck disable=SC2069
+if ! msg=$(run_oc "$opt_cfgfile" get --output=json persistentvolumes 2>&1 >"$tmpdir/pv.json"); then
   echo "$msg"
-  exit $state_critical
+  exit "$state_critical"
 fi
 
 exit_status=$state_ok
@@ -116,7 +118,8 @@ metrics=()
 #
 filter_volumes() {
   local labelval="$1"; shift
-  local label= value=
+  local label=
+  local value=
   local uidfilter=
 
   for uid; do
@@ -172,12 +175,12 @@ check() {
   local labelval="$1" warn="$2" crit="$3"
   local status
 
-  calc_stats > $tmpdir/stats.txt
+  calc_stats > "$tmpdir/stats.txt"
 
   while read line; do
     eval "local $line"
 
-    used=$(( $total - $avail ))
+    used=$(( total - avail ))
 
     # http://docs.icinga.org/latest/en/perfdata.html#perfdata-format
     metrics+=( "'${labelval:+${labelval//=/-}-}$capacity'=${used};${warn};${crit};0;${total}" )
@@ -194,8 +197,8 @@ check() {
       output+=( "${labelval:+[$labelval] }$avail of $total volumes with $capacity available" )
     fi
 
-    exit_status=$(merge_status $exit_status $status)
-  done < $tmpdir/stats.txt
+    exit_status=$(merge_status "$exit_status" "$status")
+  done < "$tmpdir/stats.txt"
 }
 
 processed=()
@@ -205,19 +208,19 @@ for line in ${limits[@]+"${limits[@]}"}; do
 
   # Find matching disks
   filter_volumes "$labelval" ${processed[@]+"${processed[@]}"} \
-    < $tmpdir/pv.json > $tmpdir/matching.json
+    < "$tmpdir/pv.json" > "$tmpdir/matching.json"
 
-  processed+=( $(get_obj_uids < $tmpdir/matching.json) )
+  processed+=( $(get_obj_uids < "$tmpdir/matching.json") )
 
-  check "$labelval" "$warn" "$crit" < $tmpdir/matching.json
+  check "$labelval" "$warn" "$crit" < "$tmpdir/matching.json"
 done
 
 # Process remaining volumes, i.e. those not explicitly requested by label value
 filter_volumes '' ${processed[@]+"${processed[@]}"} \
-  < $tmpdir/pv.json > $tmpdir/matching.json
+  < "$tmpdir/pv.json" > "$tmpdir/matching.json"
 
 IFS=';' read warn crit _ <<< "$default_limits"
-check '' "$warn" "$crit" < $tmpdir/matching.json
+check '' "$warn" "$crit" < "$tmpdir/matching.json"
 
 finish "$exit_status" \
   "$(join_args ', ' ${output[@]+"${output[@]}"})" \

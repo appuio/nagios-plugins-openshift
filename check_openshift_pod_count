@@ -63,15 +63,17 @@ if [[ -z "$opt_cfgfile" ]]; then
 fi
 
 tmpfile=$(mktemp)
-trap "rm -f $tmpfile" EXIT
+trap 'rm -f "$tmpfile"' EXIT
 
+# Capture stderr in variable and redirect stdout to file
+# shellcheck disable=SC2069
 if ! msg=$(run_oc "$opt_cfgfile" get pod \
              --output=json \
              --namespace="$opt_namespace" \
              --selector="$opt_selector" \
-             2>&1 >$tmpfile); then
+             2>&1 >"$tmpfile"); then
   echo "$msg"
-  exit $state_critical
+  exit "$state_critical"
 fi
 
 count_ready() {
@@ -83,7 +85,7 @@ count_ready() {
      ] | length'
 }
 
-count=$(count_ready < $tmpfile)
+count=$(count_ready < "$tmpfile")
 
 if [[ -n "$opt_crit" && "$count" -le "$opt_crit" ]]; then
   output="$count of a minimum of $opt_crit pods running"

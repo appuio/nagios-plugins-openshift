@@ -43,11 +43,13 @@ if [[ -z "$opt_cfgfile" || -z "$opt_name" ]]; then
 fi
 
 tmpdir=$(mktemp -d)
-trap "rm -rf $tmpdir" EXIT
+trap 'rm -rf "$tmpdir"' EXIT
 
-if ! msg=$(run_oc "$opt_cfgfile" get --output=json node "$opt_name" 2>&1 >$tmpdir/node.json); then
+# Capture stderr in variable and redirect stdout to file
+# shellcheck disable=SC2069
+if ! msg=$(run_oc "$opt_cfgfile" get --output=json node "$opt_name" 2>&1 >"$tmpdir/node.json"); then
   echo "$msg"
-  exit $state_critical
+  exit "$state_critical"
 fi
 
 exit_status=$state_ok
@@ -64,7 +66,7 @@ check_condition() {
   local expected="$2"
   local values
 
-  if values=$(get_condition "$cond" < $tmpdir/node.json); then
+  if values=$(get_condition "$cond" < "$tmpdir/node.json"); then
     eval "set -- $values"
 
     local status_lc="${1,,*}"
@@ -72,11 +74,11 @@ check_condition() {
 
     if [[ "$status_lc" != "$expected" ]]; then
       output+=( "condition \"$cond\": $msg" )
-      exit_status=$(merge_status $exit_status $state_critical)
+      exit_status=$(merge_status "$exit_status" "$state_critical")
     fi
   else
     output+=( "missing \"$cond\" condition" )
-    exit_status=$(merge_status $exit_status $state_critical)
+    exit_status=$(merge_status "$exit_status" "$state_critical")
   fi
 }
 
