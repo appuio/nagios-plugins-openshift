@@ -1,0 +1,90 @@
+#!/bin/bash
+
+set -e -u -o pipefail
+
+. /usr/lib/nagios-plugins-openshift/utils
+
+usage() {
+  echo "Usage: $0 -f <path> [--] <node...>"
+  echo
+  echo 'Compare list of nodes in cluster with names specified on command line.'
+  echo
+  echo 'Options:'
+  echo ' -f   Config file path'
+}
+
+opt_cfgfile=
+
+while getopts 'hf:' opt; do
+  case "$opt" in
+    h)
+      usage
+      exit 0
+      ;;
+    f) opt_cfgfile="$OPTARG" ;;
+    *)
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+shift $((OPTIND - 1))
+
+if [[ -z "$opt_cfgfile" || "$#" < 1 ]]; then
+  usage >&2
+  exit 1
+fi
+
+tmpfile=$(mktemp)
+trap 'rm -f "$tmpfile"' EXIT
+
+get_node_names() {
+  local cfgfile="$1"
+
+  run_oc "$cfgfile" get node \
+    --output=jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'
+}
+
+# Capture stderr in variable and redirect stdout to file
+# shellcheck disable=SC2069
+if ! msg=$(get_node_names "$opt_cfgfile" 2>&1 >"$tmpfile"); then
+  echo "$msg"
+  exit "$state_critical"
+fi
+
+readarray -t nodes < "$tmpfile"
+
+array_sort nodes ${nodes[@]+"${nodes[@]}"}
+array_sort expected ${@+"$@"}
+
+array_uniq nodes ${nodes[@]+"${nodes[@]}"}
+array_uniq expected ${expected[@]+"${expected[@]}"}
+
+array_sub missing nodes expected
+array_sub unexpected expected nodes
+
+array_and found nodes expected
+
+exit_status="$state_ok"
+output=()
+
+if [[ -n "${missing[*]+${missing[*]}}" ]]; then
+  output+=( "missing: ${missing[*]}" )
+  exit_status=$(merge_status "$exit_status" "$state_critical")
+fi
+
+if [[ -n "${unexpected[*]+${unexpected[*]}}" ]]; then
+  output+=( "unexpected: ${unexpected[*]}" )
+  exit_status=$(merge_status "$exit_status" "$state_critical")
+fi
+
+if [[ -n "${found[*]+${found[*]}}" ]]; then
+  output+=( "found: ${found[*]}")
+fi
+
+finish "$exit_status" \
+  "$(join_args ', ' ${output[@]+"${output[@]}"})" \
+  ''
+
+# vim: set sw=2 sts=2 et :

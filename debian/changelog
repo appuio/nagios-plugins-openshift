@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.8) trusty; urgency=medium
+
+  * Add "check_openshift_node_list" to verify the list of master and worker
+    nodes in a cluster.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Tue, 05 Jul 2016 13:48:23 +0200
+
 nagios-plugins-openshift (0.7) trusty; urgency=medium
 
   * Ensure values for "-w" and "-c" are integers in check_openshift_pod_count

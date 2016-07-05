@@ -39,6 +39,72 @@ validate_integer() {
 }
 
 #
+# Sort arguments into array variable given as first argument
+#
+# Arguments:
+# - var: Name of output variable
+# - args...: Values
+#
+# Source: https://stackoverflow.com/a/7442583
+#
+array_sort() {
+  local var="$1"; shift
+
+  readarray -t "$var" < <(printf '%s\0' "$@" | LC_ALL=C sort -z | xargs -0n1)
+}
+
+#
+# Copy unique arguments into array variable given as first argument. The input
+# elements must be sorted.
+#
+# Arguments:
+# - var: Name of output variable
+# - args...: Values
+#
+array_uniq() {
+  local var="$1"; shift
+
+  readarray -t "$var" < <(printf '%s\0' "$@" | LC_ALL=C uniq -z | xargs -0n1)
+}
+
+#
+# Subtract matching elements in second array from first array and store
+# the result into array variable given as first argument (var = b - a).
+# The input arrays must be sorted. Elements must not contain newline
+# characters.
+#
+# Arguments:
+# - var: Name of output variable
+# - a: Name of first input array
+# - b: Name of second input array
+#
+# Source: https://unix.stackexchange.com/a/104848
+#
+array_sub() {
+  # Use indirect referencing with array, see <https://stackoverflow.com/a/4582492>
+  local var="$1" a="$2[@]" b="$3[@]"
+
+  readarray -t "$var" < <(comm -13 <(printf '%s\n' ${!a+"${!a}"}) <(printf '%s\n' ${!b+"${!b}"}))
+}
+
+#
+# Compute common elements between two arrays and store the result into array
+# variable given as first argument (var = b & a). The input arrays must be
+# sorted. Elements must not contain newline characters.
+#
+# Arguments:
+# - var: Name of output variable
+# - a: Name of first input array
+# - b: Name of second input array
+#
+array_and() {
+  # Use indirect referencing with array, see <https://stackoverflow.com/a/4582492>
+  local var="$1" a="$2[@]" b="$3[@]"
+
+  readarray -t "$var" < <(comm -12 <(printf '%s\n' ${!a+"${!a}"}) <(printf '%s\n' ${!b+"${!b}"}))
+}
+
+#
 # Merge exit status
 #
 # Warning wins over OK, critical wins over warning
