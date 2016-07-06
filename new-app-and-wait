@@ -1,0 +1,147 @@
+#!/usr/bin/python3
+
+import sys
+import argparse
+import functools
+import logging
+import re
+import time
+
+from vshn_npo import constants
+from vshn_npo import oc_client
+from vshn_npo import retry
+from vshn_npo import utils
+
+
+class ExpectedPatternContext(retry.UrlWaitContext):
+  def __init__(self, info_fn, pattern):
+    super(ExpectedPatternContext, self).__init__()
+
+    self._info_fn = info_fn
+    self._pattern = pattern
+
+  def before_request(self):
+    if self._info_fn:
+      self._info_fn()
+
+  def check_response(self, resp):
+    super(ExpectedPatternContext, self).check_response(resp)
+
+    if not self._pattern.search(resp.text):
+      raise Exception("Expected pattern \"{}\" not found".format(self._pattern.pattern))
+
+
+def Check(client, args, timeout):
+  appname = "testapp"
+
+  create_cmd = [
+    "new-app",
+    "--name={}".format(appname),
+    args.source,
+    ]
+
+  if args.strategy is not None:
+    create_cmd.append("--strategy={}".format(args.strategy))
+
+  client.run(create_cmd)
+
+  client.run(["expose", "svc", appname])
+
+  route = client.capture_json(["get", "--output=json", "route", appname])
+  host = route["spec"]["host"]
+
+  utils.validate_fqdn(host)
+
+  url = "http://{}{}".format(host, args.path)
+
+  info_fn = functools.partial(client.run, ["deploy", appname])
+  ctx = ExpectedPatternContext(info_fn, args.pattern)
+
+  return retry.wait_for_url(url, timeout.remaining, ctx=ctx)
+
+
+def main():
+  arg_formatter = argparse.ArgumentDefaultsHelpFormatter
+  parser = argparse.ArgumentParser(formatter_class=arg_formatter)
+  parser.add_argument("--nagios-output", type=str, metavar="FILE", default=None,
+                      help=("Write Nagios-compatile output to FILE rather than"
+                            " standard output"))
+  parser.add_argument("--oc", type=str, default="oc",
+                      help="Path to OpenShift client binary")
+  parser.add_argument("--strategy", choices=["docker", "source"], default=None,
+                      help=("Specify the build strategy to use if"
+                            " detection should not be used"))
+  parser.add_argument("-w", "--warning", type=int, metavar="SEC", default=5 * 60,
+                      help=("Warn if application takes more given number of"
+                            " seconds to become available"))
+  parser.add_argument("-c", "--critical", type=int, metavar="SEC", default=15 * 60,
+                      help=("Fail if application takes more given number of"
+                            " seconds to become available"))
+  parser.add_argument("--path", type=str, default="/",
+                      help="Resource to request from application")
+  parser.add_argument("--pattern", type=re.compile, default="<body>",
+                      help=("Regular expression pattern to expect in body;"
+                            " use \"(?i)\" for a case-insensitive pattern"))
+  parser.add_argument("config", type=str,
+                      help="Configuration file with login credentials")
+  parser.add_argument("source", type=str,
+                      help=("Source code URL, template name or image name;"
+                            " see \"oc new-app --help\""))
+  args = parser.parse_args()
+
+  if args.critical < args.warning:
+    parser.error("--warning must be less than --critical")
+
+  logging.basicConfig(level=logging.NOTSET,
+                      format="%(asctime)s %(message)s")
+
+  with utils.NagiosOutputFile(args.nagios_output) as exit_fn, \
+       oc_client.TemporaryConfig(args.config) as cfgfile:
+    cl = oc_client.Client(args.oc, cfgfile)
+
+    cl.run(["whoami"])
+
+    namer = oc_client.ProjectNamer("bd")
+
+    # Get rid of old projects
+    oc_client.cleanup_projects(cl, namer, 2 * args.critical, 24 * 3600)
+
+    timeout = utils.Timeout(max(args.warning, args.critical))
+
+    project_name = oc_client.create_project(cl, namer)
+
+    cl.namespace = project_name
+
+    try:
+      duration = Check(cl, args, timeout)
+    finally:
+      cl.run(["status", "-v"])
+
+    try:
+      oc_client.delete_project(cl, project_name)
+    except Exception:
+      logging.exception("Ignored project deletion error")
+
+    if duration >= args.warning:
+      code = constants.STATE_WARNING
+    else:
+      code = constants.STATE_OK
+
+    noneempty_fn = lambda value: "" if value is None else value
+
+    # http://docs.icinga.org/latest/en/perfdata.html#perfdata-format
+    metrics = [
+        ("duration={}s;{};{};0".
+         format(int(duration), noneempty_fn(args.warning),
+                noneempty_fn(args.critical))),
+        ]
+
+    exit_fn(code,
+            "Available after {:0.0f} seconds".format(duration),
+            metrics=metrics)
+
+
+if __name__ == "__main__":
+  main()
+
+# vim: set sw=2 sts=2 et :

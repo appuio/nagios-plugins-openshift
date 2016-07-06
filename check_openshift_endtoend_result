@@ -1,0 +1,53 @@
+#!/bin/bash
+
+set -e -u -o pipefail
+
+readonly cfa=/usr/lib/nagios/plugins/check_file_age
+
+. /usr/lib/nagios-plugins-openshift/utils
+
+usage() {
+  echo "Usage: $0 <statusdir>"
+  echo
+  echo 'Options:'
+  echo 'statusdir  Directory with status information'
+}
+
+if [[ "$#" != 1 ]]; then
+  usage >&2
+  exit 1
+fi
+
+statusdir="$1"
+
+if [[ ! -d "$statusdir" ]]; then
+  echo "CRITICAL $statusdir does not exist"
+  exit "$state_critical"
+fi
+
+statusfile="$statusdir/status.txt"
+
+# Check whether status file has been updated recently
+if msg=$(LC_ALL=C "$cfa" -w $(( 2 * 3600 )) -c $(( 4 * 3600 )) -f "$statusfile" 2>&1); then
+  :
+else
+  echo "$msg"
+  exit "$state_critical"
+fi
+
+# Default exit code
+exitcode="$state_critical"
+
+while read line; do
+  if [[ -z "$line" ]]; then
+    # Pass remainder of input file through
+    cat
+    break
+  elif [[ "$line" =~ ^X-Status:[[:space:]]([0-9]+)$ ]]; then
+    exitcode=${BASH_REMATCH[1]}
+  fi
+done < "$statusfile"
+
+exit "$exitcode"
+
+# vim: set sw=2 sts=2 et :

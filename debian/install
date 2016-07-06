@@ -1,3 +1,5 @@
 check_* usr/lib/nagios/plugins
+new-app-and-wait usr/lib/nagios-plugins-openshift
+logging-wrapper usr/lib/nagios-plugins-openshift
 utils usr/lib/nagios-plugins-openshift
 write-config usr/lib/nagios-plugins-openshift
