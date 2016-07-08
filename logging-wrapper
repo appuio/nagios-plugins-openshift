@@ -42,7 +42,7 @@ lockfile="$statusdir/lock"
 lock_timeout=10
 
 if [[ -n "$delay" ]]; then
-  sleep $((RANDOM % delay))
+  sleep $((RANDOM % delay)) || :
 fi
 
 exec 200>"$lockfile"
