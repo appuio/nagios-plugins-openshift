@@ -79,6 +79,11 @@ fi
   if [[ -e "$tmpdir/output.txt" ]]; then
     cat "$tmpdir/output.txt"
   fi
+
+  if [[ "$exitcode" > 0 ]]; then
+    echo
+    echo "Logs are in \"$logdir\" on \"$(hostname -f || :)\""
+  fi
 } > "$tmpdir/status.txt"
 
 mv "$tmpdir/status.txt" "$statusfile"
