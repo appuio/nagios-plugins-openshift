@@ -47,6 +47,7 @@ def Check(client, args, timeout):
 
   client.run(["expose", "svc", appname])
 
+  # Construct application URL
   route = client.capture_json(["get", "--output=json", "route", appname])
   host = route["spec"]["host"]
 
@@ -54,6 +55,7 @@ def Check(client, args, timeout):
 
   url = "http://{}{}".format(host, args.path)
 
+  # Wait until application becomes available
   info_fn = functools.partial(client.run, ["deploy", appname])
   ctx = ExpectedPatternContext(info_fn, args.pattern)
 
