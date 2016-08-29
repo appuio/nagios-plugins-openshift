@@ -1,3 +1,9 @@
+nagios-plugins-openshift (0.9.4) trusty; urgency=medium
+
+  * Add plugin to check persistent volume claim phases.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Mon, 29 Aug 2016 16:20:01 +0200
+
 nagios-plugins-openshift (0.9.2) trusty; urgency=medium
 
   * Write location of log directory in case of failure in "logging-wrapper".
