@@ -1,3 +1,11 @@
+nagios-plugins-openshift (0.9.6) trusty; urgency=medium
+
+  * Detect non-writable configuration in "write-config".
+  * Add plugin to check node resources allocated to containers (CPU and
+    memory).
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Tue, 30 Aug 2016 17:26:30 +0200
+
 nagios-plugins-openshift (0.9.5) trusty; urgency=medium
 
   * Replace comparison operator "<" with "-lt" in logging wrapper.

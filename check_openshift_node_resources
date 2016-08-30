@@ -1,0 +1,164 @@
+#!/usr/bin/python3
+
+import argparse
+import nagiosplugin
+import re
+
+from vshn_npo import constants
+from vshn_npo import oc_client
+
+
+RES_NAMES = \
+    sorted("{}-{}".format(i, j)
+           for i in ["cpu", "memory"]
+           for j in ["limits", "requests"])
+
+
+class ResourcesNotFound(Exception):
+  pass
+
+
+def _col_pattern(name):
+  return "".join([
+    r"\d+(?:|\.\d+)[a-z]{0,5}\s+\(\s*(?P<",
+    name,
+    r">\d+(?:|\.\d+))\s*%\s*\)",
+    ])
+
+
+def _extract_resources(lines):
+  """Parse output from "oc describe node <node>".
+
+  There is no easy way to retrieve this information in a machine-readable
+  format.
+
+  """
+  while lines:
+    line = lines.pop(0)
+    if re.match(r"^Allocated\s+resources\s*:\s*$", line, re.I):
+      break
+
+  if not lines:
+    raise ResourcesNotFound()
+
+  while lines:
+    line = lines.pop(0)
+
+    # Changed output formats can be handled in separate branches
+    if re.match((r"^\s*CPU\s+Requests\s+CPU\s+Limits\s+Memory\s+Requests"
+                 r"\s+Memory\s+Limits\s*$"),
+                line, re.I):
+      # Remove separator (if any)
+      if lines and re.match(r"^[-\s]{10,}$", lines[0]):
+        del lines[0]
+
+      pattern = "".join([
+        r"(?i)^\s*",
+        _col_pattern("cpu_requests"),
+        r"\s+",
+        _col_pattern("cpu_limits"),
+        r"\s+",
+        _col_pattern("memory_requests"),
+        r"\s+",
+        _col_pattern("memory_limits"),
+        r"\s*$",
+        ])
+
+      if lines:
+        m = re.match(pattern, lines[0])
+        if m:
+          # Extract value for each name
+          return dict((i, float(m.group(i.replace("-", "_"))))
+                      for i in RES_NAMES)
+
+  raise ResourcesNotFound()
+
+
+class NodeResources(nagiosplugin.Resource):
+  def __init__(self, client, node):
+    self._client = client
+    self._node = node
+
+  def probe(self):
+    output = self._client.capture_output(["describe", "node", self._node])
+
+    try:
+      for (key, value) in sorted(_extract_resources(output.splitlines()).items()):
+        yield nagiosplugin.Metric(key, value, uom="%", min=0, context=key)
+    except ResourcesNotFound:
+      raise nagiosplugin.CheckError("Allocated resources not found in output")
+
+
+class NodeSummary(nagiosplugin.Summary):
+  """Format check summary with all results.
+
+  The base class only uses the most significant result as determined by result
+  status.
+
+  """
+  @staticmethod
+  def _format(results):
+    return ", ".join(sorted(str(i) for i in results))
+
+  def ok(self, results):
+    return self._format(results)
+
+  def problem(self, results):
+    return self._format(results.most_significant)
+
+
+def _parse_range(value):
+  parts = value.split("=", 1)
+
+  if len(parts) != 2:
+    raise argparse.ArgumentTypeError("Must use format NAME=RANGE")
+
+  return parts
+
+
+def _convert_ranges(values):
+  result = dict.fromkeys(RES_NAMES, None)
+
+  if values:
+    for (name, i) in values:
+      if name not in result:
+        raise ValueError("Unknown value name: {}".format(name))
+      result[name] = i
+
+  return result
+
+
+@nagiosplugin.guarded
+def main():
+  parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+  parser.add_argument("-v", "--verbose", action="count", default=0,
+                      help="Increase output verbosity")
+  parser.add_argument("--oc", type=str, default=constants.DEFAULT_OC_BINARY,
+                      help="Path to OpenShift client binary")
+  parser.add_argument("--config", type=str, default=None,
+                      help="Configuration file with login credentials")
+  parser.add_argument("-n", "--node", required=True, help="Node name")
+  parser.add_argument("-w", "--warning", metavar="NAME=WARN",
+                      type=_parse_range, action="append",
+                      help="Warn if named value is outside given range")
+  parser.add_argument("-c", "--critical", metavar="NAME=CRIT",
+                      type=_parse_range, action="append",
+                      help="Critical if named value is outside given range")
+  args = parser.parse_args()
+
+  client = oc_client.Client(args.oc, args.config)
+
+  warn = _convert_ranges(args.warning)
+  crit = _convert_ranges(args.critical)
+
+  checks = [NodeResources(client, args.node), NodeSummary()]
+  checks.extend(nagiosplugin.ScalarContext(i, warning=warn[i], critical=crit[i])
+                for i in RES_NAMES)
+
+  nagiosplugin.Check(*checks).main(verbose=args.verbose, timeout=None)
+
+
+if __name__ == "__main__":
+  main()
+
+# vim: set sw=2 sts=2 et :
