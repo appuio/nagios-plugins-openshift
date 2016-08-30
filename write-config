@@ -88,4 +88,10 @@ context_nickname="ctx-$cluster_nickname-$user_nickname"
 /usr/bin/oc --config="$opt_cfgfile" config use-context \
   "$context_nickname"
 
+if [[ ! -w "$opt_cfgfile" ]]; then
+  # As of version 1.2.1 "oc" does not fail when the file couldn't be written
+  echo "Configuration file \"$opt_cfgfile\" is not writable"
+  exit 1
+fi
+
 # vim: set sw=2 sts=2 et :
