@@ -117,10 +117,10 @@ class Client:
     cmd = self._make_base_cmd()
     cmd.extend(args)
     logging.debug("%r", cmd)
-    return subprocess.check_output(cmd)
+    return subprocess.check_output(cmd).decode("UTF-8")
 
   def capture_json(self, args):
-    return json.loads(self.capture_output(args).decode("UTF-8"))
+    return json.loads(self.capture_output(args))
 
 
 def create_project(client, namer):
