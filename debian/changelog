@@ -1,3 +1,9 @@
+nagios-plugins-openshift (0.9.5) trusty; urgency=medium
+
+  * Replace comparison operator "<" with "-lt" in logging wrapper.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Tue, 30 Aug 2016 12:02:36 +0200
+
 nagios-plugins-openshift (0.9.4) trusty; urgency=medium
 
   * Add plugin to check persistent volume claim phases.

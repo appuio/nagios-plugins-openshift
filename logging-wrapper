@@ -14,7 +14,7 @@ usage() {
   echo 'args...    Arguments for command'
 }
 
-if [[ "$#" < 2 ]]; then
+if [[ "$#" -lt 2 ]]; then
   usage >&2
   exit 1
 fi
