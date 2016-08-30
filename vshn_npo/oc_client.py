@@ -97,11 +97,15 @@ class Client:
     self._ns = value
 
   def _make_base_cmd(self):
-    return [
+    result = [
         self._binary,
-        "--config={}".format(self._cfgfile),
         "--namespace={}".format(self._ns),
         ]
+
+    if self._cfgfile is not None:
+      result.append("--config={}".format(self._cfgfile))
+
+    return result
 
   def run(self, args):
     cmd = self._make_base_cmd()
