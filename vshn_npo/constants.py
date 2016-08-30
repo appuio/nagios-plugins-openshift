@@ -10,4 +10,6 @@ STATE_TEXT = {
     STATE_UNKNOWN: "UNKNOWN",
     }
 
+DEFAULT_OC_BINARY = "/usr/bin/oc"
+
 # vim: set sw=2 sts=2 et :

@@ -68,7 +68,7 @@ def main():
   parser.add_argument("--nagios-output", type=str, metavar="FILE", default=None,
                       help=("Write Nagios-compatile output to FILE rather than"
                             " standard output"))
-  parser.add_argument("--oc", type=str, default="oc",
+  parser.add_argument("--oc", type=str, default=constants.DEFAULT_OC_BINARY,
                       help="Path to OpenShift client binary")
   parser.add_argument("--strategy", choices=["docker", "source"], default=None,
                       help=("Specify the build strategy to use if"
