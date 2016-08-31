@@ -86,6 +86,9 @@ def main():
   parser.add_argument("--pattern", type=re.compile, default="<body>",
                       help=("Regular expression pattern to expect in body;"
                             " use \"(?i)\" for a case-insensitive pattern"))
+  parser.add_argument("--pattern-from", type=argparse.FileType("r"),
+                      default=None, metavar="FILE",
+                      help="Load expected pattern from file")
   parser.add_argument("config", type=str,
                       help="Configuration file with login credentials")
   parser.add_argument("source", type=str,
@@ -95,6 +98,10 @@ def main():
 
   if args.critical < args.warning:
     parser.error("--warning must be less than --critical")
+
+  if args.pattern_from is not None:
+    args.pattern = re.compile(args.pattern_from.read().rstrip())
+    args.pattern_from = None
 
   logging.basicConfig(level=logging.NOTSET,
                       format="%(asctime)s %(message)s")
