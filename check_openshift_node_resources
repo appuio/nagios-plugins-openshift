@@ -123,6 +123,8 @@ def _convert_ranges(values):
     for (name, i) in values:
       if name not in result:
         raise ValueError("Unknown value name: {}".format(name))
+      if not i:
+        raise ValueError("Value \"{}\" requires range".format(name))
       result[name] = i
 
   return result
