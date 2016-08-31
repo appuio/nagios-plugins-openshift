@@ -59,6 +59,8 @@ def Check(client, args, timeout):
   info_fn = functools.partial(client.run, ["deploy", appname])
   ctx = ExpectedPatternContext(info_fn, args.pattern)
 
+  logging.info("Waiting for %s to match pattern %r", url, args.pattern)
+
   return retry.wait_for_url(url, timeout.remaining, ctx=ctx)
 
 
