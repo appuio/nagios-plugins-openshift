@@ -148,7 +148,8 @@ def main():
         ]
 
     exit_fn(code,
-            "Available after {:0.0f} seconds".format(duration),
+            ("Available after {:0.0f} seconds at {}".
+             format(duration, time.asctime())),
             metrics=metrics)
 
 
