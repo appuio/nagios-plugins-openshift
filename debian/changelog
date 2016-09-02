@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.9.8) trusty; urgency=medium
+
+  * Add "check_openshift_node_fluentd" checking for exactly one running
+    Fluentd instance per node.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Fri, 02 Sep 2016 13:07:31 +0200
+
 nagios-plugins-openshift (0.9.7) trusty; urgency=medium
 
   * Support reading pattern from file in "new-app-and-wait".
