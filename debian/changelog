@@ -1,3 +1,9 @@
+nagios-plugins-openshift (0.9.9) trusty; urgency=medium
+
+  * Add "check_openshift_es_stats" checking Elasticsearch statistics.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Mon, 05 Sep 2016 12:14:47 +0200
+
 nagios-plugins-openshift (0.9.8) trusty; urgency=medium
 
   * Add "check_openshift_node_fluentd" checking for exactly one running

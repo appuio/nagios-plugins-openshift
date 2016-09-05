@@ -1,0 +1,92 @@
+#!/usr/bin/python3
+
+import argparse
+import nagiosplugin
+import requests
+
+from vshn_npo import constants
+
+
+def _bytes_to_mb(value):
+  return int(round(value / (1024.0 * 1024), 0))
+
+
+class StatsQuery(nagiosplugin.Resource):
+  def __init__(self, endpoint, token):
+    self._endpoint = endpoint
+    self._token = token
+
+  def probe(self):
+    url = "{}/_nodes/stats/fs".format(self._endpoint)
+    headers = {
+        "Authorization": "Bearer {}".format(self._token),
+        }
+
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+
+    data = response.json()
+
+    for (key, node) in data["nodes"].items():
+      prefix = "node-{}".format(key)
+
+      # TODO: Monitor per-path space, not only globally
+      allpaths = node["fs"]["total"]
+
+      availmb = _bytes_to_mb(allpaths["available_in_bytes"])
+      totalmb = _bytes_to_mb(allpaths["total_in_bytes"])
+      usedmb = totalmb - availmb
+
+      yield nagiosplugin.Metric("used-{}".format(key), usedmb,
+                                uom="MB", min=0, max=totalmb,
+                                context="fs-used")
+
+      usedperc = int(100.0 * usedmb / totalmb)
+
+      yield nagiosplugin.Metric("used-percent-{}".format(key), usedperc,
+                                uom="%", min=0, max=100,
+                                context="fs-used-percent")
+
+
+@nagiosplugin.guarded
+def main():
+  parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+  parser.add_argument("-v", "--verbose", action="count", default=0,
+                      help="Increase output verbosity")
+  parser.add_argument("--fs-used-warn", metavar="RANGE",
+                      help="Warn if consumed disk space is above given percentage")
+  parser.add_argument("--fs-used-critical", metavar="RANGE",
+                      help="Critical if consumed disk space is above given percentage")
+
+  parser.add_argument("--endpoint", required=True, metavar="URL",
+                      help="API endpoint")
+
+  tokgroup = parser.add_mutually_exclusive_group(required=False)
+  tokgroup.add_argument("--token", help="Bearer token for authentication")
+  tokgroup.add_argument("--token-from", metavar="PATH",
+                        type=argparse.FileType(mode="r"),
+                        help=("Path to file containing bearer token for"
+                              " authentication"))
+
+  args = parser.parse_args()
+
+  if args.token_from is not None:
+    token = args.token_from.read().rstrip()
+  else:
+    token = args.token
+
+  checks = [
+      StatsQuery(args.endpoint, token),
+      nagiosplugin.ScalarContext("fs-used-percent",
+                                 warning=args.fs_used_warn,
+                                 critical=args.fs_used_critical),
+      nagiosplugin.ScalarContext("fs-used"),
+      ]
+
+  nagiosplugin.Check(*checks).main(verbose=args.verbose, timeout=None)
+
+
+if __name__ == "__main__":
+  main()
+
+# vim: set sw=2 sts=2 et :
