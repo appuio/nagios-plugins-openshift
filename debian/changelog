@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.9.10) trusty; urgency=medium
+
+  * Add argument "-C" to "write-config" to check whether configuration file
+    would change.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Mon, 05 Sep 2016 15:35:47 +0200
+
 nagios-plugins-openshift (0.9.9) trusty; urgency=medium
 
   * Add "check_openshift_es_stats" checking Elasticsearch statistics.

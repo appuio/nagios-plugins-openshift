@@ -11,13 +11,17 @@ usage() {
   echo ' -f   Config file path'
   echo ' -s   Address and port of the OpenShift API server'
   echo ' -t   Bearer token for authentication'
+  echo ' -C   Check whether configuration differs from file given as'\
+    'destination; exit status 0 indicates no changes; any other status'\
+    'indicates either a non-existing destination file or trouble'
 }
 
 opt_cfgfile=
 opt_server=
 opt_token=
+opt_check=
 
-while getopts 'hf:s:t:' opt; do
+while getopts 'hf:s:t:C' opt; do
   case "$opt" in
     h)
       usage
@@ -26,6 +30,7 @@ while getopts 'hf:s:t:' opt; do
     f) opt_cfgfile="$OPTARG" ;;
     s) opt_server="$OPTARG" ;;
     t) opt_token="$OPTARG" ;;
+    C) opt_check=yes ;;
     *)
       usage >&2
       exit 1
@@ -91,6 +96,12 @@ context_nickname="ctx-$cluster_nickname-$user_nickname"
 /usr/bin/oc --config="$tmpfile" config use-context \
   "$context_nickname"
 
-cp "$tmpfile" "$opt_cfgfile"
+if [[ -n "$opt_check" ]]; then
+  /usr/bin/cmp --silent "$tmpfile" "$opt_cfgfile"
+else
+  cp "$tmpfile" "$opt_cfgfile"
+fi
+
+exit 0
 
 # vim: set sw=2 sts=2 et :
