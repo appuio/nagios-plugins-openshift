@@ -27,6 +27,8 @@ class StatsQuery(nagiosplugin.Resource):
 
     data = response.json()
 
+    # Data structure documentation:
+    # https://www.elastic.co/guide/en/elasticsearch/reference/2.4/cluster-nodes-stats.html#fs-info
     for (key, node) in data["nodes"].items():
       prefix = "node-{}".format(key)
 
