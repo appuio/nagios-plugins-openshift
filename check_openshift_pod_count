@@ -87,11 +87,11 @@ count_ready() {
 
 count=$(count_ready < "$tmpfile")
 
-if [[ -n "$opt_crit" && "$count" -le "$opt_crit" ]]; then
-  output="$count of a minimum of $opt_crit pods running"
+if [[ -n "$opt_crit" && "$count" -lt "$opt_crit" ]]; then
+  output="$count pods running, but at least $opt_crit required"
   exit_status=$state_critical
-elif [[ -n "$opt_warn" && "$count" -le "$opt_warn" ]]; then
-  output="$count pods running, at least $opt_warn desired"
+elif [[ -n "$opt_warn" && "$count" -lt "$opt_warn" ]]; then
+  output="$count pods running, but at least $opt_warn desired"
   exit_status=$state_warning
 else
   output="$count pods running"

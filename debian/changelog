@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.9.11) trusty; urgency=medium
+
+  * Fix off-by-one bug when evaluating pod counts in
+    "check_openshift_pod_count".
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Tue, 06 Sep 2016 16:04:39 +0200
+
 nagios-plugins-openshift (0.9.10) trusty; urgency=medium
 
   * Add argument "-C" to "write-config" to check whether configuration file
