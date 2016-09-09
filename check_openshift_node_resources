@@ -5,6 +5,7 @@ import nagiosplugin
 import re
 
 from vshn_npo import constants
+from vshn_npo import nagiosutils
 from vshn_npo import oc_client
 
 
@@ -89,24 +90,6 @@ class NodeResources(nagiosplugin.Resource):
       raise nagiosplugin.CheckError("Allocated resources not found in output")
 
 
-class NodeSummary(nagiosplugin.Summary):
-  """Format check summary with all results.
-
-  The base class only uses the most significant result as determined by result
-  status.
-
-  """
-  @staticmethod
-  def _format(results):
-    return ", ".join(sorted(str(i) for i in results))
-
-  def ok(self, results):
-    return self._format(results)
-
-  def problem(self, results):
-    return self._format(results.most_significant)
-
-
 def _parse_range(value):
   parts = value.split("=", 1)
 
@@ -153,7 +136,10 @@ def main():
   warn = _convert_ranges(args.warning)
   crit = _convert_ranges(args.critical)
 
-  checks = [NodeResources(client, args.node), NodeSummary()]
+  checks = [
+      NodeResources(client, args.node),
+      nagiosutils.FullSummary(),
+      ]
   checks.extend(nagiosplugin.ScalarContext(i, warning=warn[i], critical=crit[i])
                 for i in RES_NAMES)
 
