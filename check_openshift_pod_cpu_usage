@@ -31,10 +31,7 @@ class ContainerMetrics(collections.namedtuple("ContainerMetrics", [
 def select_metrics(client, label_filter):
   tags = {
       "descriptor_name": "cpu/usage",
-
-      # TODO: Filter on type=pod_container instead of container_name once
-      # Hawkular-Metrics 0.8.2 or newer is used on all clusters
-      "container_name": ".*",
+      "type": "pod_container",
       }
 
   for i in hawkular_utils.select_metrics(client, label_filter, tags):
