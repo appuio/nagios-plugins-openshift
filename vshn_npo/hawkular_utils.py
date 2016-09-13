@@ -1,3 +1,38 @@
+import argparse
+
+
+class _SelectorArg:
+  """Utility to parse label selector from command line arguments.
+
+  """
+  def __init__(self):
+    self._sel = {}
+
+  def __str__(self):
+    return repr(self._sel)
+
+  def append(self, value):
+    parts = value.split("=", 1)
+
+    if len(parts) != 2:
+      raise argparse.ArgumentTypeError("Must use format KEY=VALUE")
+
+    self._sel[parts[0]] = parts[1]
+
+  def dict(self):
+    """Retrieve desired labels and values.
+
+    :return: Dictionary with labels
+
+    """
+    return self._sel
+
+
+def add_label_filter_argument(parser):
+  parser.add_argument("-l", "--selector", metavar="NAME=VALUE",
+                      default=_SelectorArg(), action="append",
+                      help="Selector (label query) to filter on")
+
 
 class LabelFilter:
   def __init__(self, wanted):
