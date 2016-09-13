@@ -122,12 +122,12 @@ def calc_usage(client, server_now, interval, container):
   usage_diff_ns = cpu_usage_bucket["max"] - cpu_usage_bucket["min"]
 
   if container.container_name:
-    cpu_usage_name = "{}/{}".format(container.pod_name, container.container_name)
-    cpu_limit_name = \
-        "{}/{}/limit".format(container.pod_name, container.container_name)
+    base_name = "{}/{}".format(container.pod_name, container.container_name)
   else:
-    cpu_usage_name = container.pod_name
-    cpu_limit_name = container.pod_name
+    base_name = container.pod_name
+
+  cpu_usage_name = base_name
+  cpu_limit_name = "{}/limit".format(base_name, container.container_name)
 
   # Calculate CPU core usage (may be more than 1.0 for multi-CPU systems)
   core_usage = float(usage_diff_ns) / (uptime_diff_ms * 1000000)
