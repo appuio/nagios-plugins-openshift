@@ -39,13 +39,13 @@ class StatsQuery(nagiosplugin.Resource):
       totalmb = _bytes_to_mb(allpaths["total_in_bytes"])
       usedmb = totalmb - availmb
 
-      yield nagiosplugin.Metric("used-{}".format(key), usedmb,
+      yield nagiosplugin.Metric("fs-used-{}".format(key), usedmb,
                                 uom="MB", min=0, max=totalmb,
                                 context="fs-used")
 
       usedperc = int(100.0 * usedmb / totalmb)
 
-      yield nagiosplugin.Metric("used-percent-{}".format(key), usedperc,
+      yield nagiosplugin.Metric("fs-used-percent-{}".format(key), usedperc,
                                 uom="%", min=0, max=100,
                                 context="fs-used-percent")
 
