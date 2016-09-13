@@ -29,6 +29,11 @@ class ContainerMetrics(collections.namedtuple("ContainerMetrics", [
 
 
 def select_metrics(client, label_filter):
+  # TODO: Calculate usage per pod instead of per container
+  #
+  # <https://github.com/openshift/origin-metrics/blob/master/docs/
+  # hawkular_metrics.adoc#consolidating-metric-data-across-multiple-containers>
+  #
   tags = {
       "descriptor_name": "cpu/usage",
       "type": "pod_container",
