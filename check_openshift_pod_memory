@@ -1,0 +1,217 @@
+#!/usr/bin/python3
+
+import argparse
+import operator
+import collections
+import time
+import nagiosplugin
+
+import vshn_npo.hawkular_client
+from vshn_npo import nagiosutils
+from vshn_npo import hawkular_utils
+
+from vshn_npo.hawkular_client import idquote as idquote
+
+
+(_BUCKET_GAUGE,
+ _BUCKET_COUNTER) = range(1, 3)
+
+_MIN_INTERVAL = 60
+
+
+class MetricInfo(collections.namedtuple("MetricInfo", [
+  "name",
+  "kind",
+  "metric_id",
+  ])):
+  pass
+
+
+class PodMetricInfo:
+  def __init__(self):
+    self.pod_name = None
+    self.major_page_faults = None
+    self.page_faults = None
+    self.working_set = None
+    self.usage = None
+    self.limit = None
+
+
+def select_metrics(client, label_filter):
+  tags = {
+      "descriptor_name": "memory/usage",
+      "type": "pod",
+      }
+
+  for i in hawkular_utils.select_metrics(client, label_filter, tags):
+    try:
+      pod_name = i["tags"]["pod_name"]
+    except KeyError:
+      continue
+
+    # Assume ID ends with given string; a better implementation, though
+    # resulting in more API calls, would use a filter using "pod_id" and
+    # "descriptor_name" to retrieve the metric ID.
+    assert i["id"].endswith("/memory/usage")
+
+    base_metric_id = i["id"][:-5]
+
+    metric_id_fn = lambda suffix: "{}{}".format(base_metric_id, suffix)
+    name_fn = lambda suffix: "{}/{}".format(pod_name, suffix)
+    metric_fn = \
+        lambda suffix, kind: \
+        MetricInfo(name_fn(suffix), kind, metric_id_fn(suffix))
+
+    info = PodMetricInfo()
+    info.pod_name = pod_name
+    info.major_page_faults = metric_fn("major_page_faults", _BUCKET_COUNTER)
+    info.page_faults = metric_fn("page_faults", _BUCKET_COUNTER)
+    info.working_set = metric_fn("working_set", _BUCKET_GAUGE)
+    info.usage = metric_fn("usage", _BUCKET_GAUGE)
+    info.limit = metric_fn("limit", _BUCKET_GAUGE)
+
+    yield info
+
+
+_BUCKET_PATH_PREFIX = {
+    _BUCKET_GAUGE: "gauges",
+    _BUCKET_COUNTER: "counters",
+    }
+
+
+def get_bucket(client, kind, name, duration, params):
+  """Retrieve most recent bucket.
+
+  """
+  params = params.copy()
+  params["bucketDuration"] = "{}s".format(duration)
+
+  try:
+    path_prefix = _BUCKET_PATH_PREFIX[kind]
+  except KeyError:
+    raise Exception("Unknown kind {}".format(kind))
+
+  response = client.get("{}/{}/data".format(path_prefix, idquote(name)), params=params)
+
+  if response.data:
+    for i in sorted(response.data, key=operator.itemgetter("end"), reverse=True):
+      bucket = response.data[0]
+      if not bucket.get("empty", False):
+        return bucket
+
+  return None
+
+
+def get_metrics(client, server_now, interval, info):
+  usage_bucket = \
+      get_bucket(client, info.usage.kind, info.usage.metric_id, interval, {
+        "start": str(1000 * int(server_now - interval)),
+        })
+
+  if not usage_bucket:
+    return
+
+  max_usage = round(usage_bucket["max"])
+
+  yield nagiosplugin.Metric(info.usage.name, max_usage, uom="B", min=0,
+      context="default")
+
+  get_fn = lambda metric: \
+      get_bucket(client, metric.kind, metric.metric_id, interval, {
+        "start": usage_bucket["start"],
+        "end": usage_bucket["end"],
+        })
+
+  limit_bucket = get_fn(info.limit)
+
+  if limit_bucket and limit_bucket["max"] > 0:
+    max_limit = round(limit_bucket["max"])
+
+    yield nagiosplugin.Metric(info.limit.name, max_limit, uom="B", min=0,
+        context="default")
+
+    usage_percent_name = "{}/limit".format(info.usage.name)
+    usage_percent = round(100.0 * max_usage / max_limit)
+
+    yield nagiosplugin.Metric(usage_percent_name, usage_percent,
+        uom="%", min=0, context="mem-limit-usage")
+
+  working_set_bucket = get_fn(info.working_set)
+
+  if working_set_bucket:
+    yield nagiosplugin.Metric(info.working_set.name,
+        round(working_set_bucket["max"]),
+        uom="B", min=0, context="default")
+
+  for metric in [info.major_page_faults, info.page_faults]:
+    bucket = get_fn(metric)
+
+    if bucket:
+      yield nagiosplugin.Metric(metric.name, round(bucket["max"]),
+          uom="c", min=0, context="default")
+
+
+class MemStats(nagiosplugin.Resource):
+  def __init__(self, client, label_filter, interval):
+    self._client = client
+    self._label_filter = label_filter
+    self._interval = interval
+
+  def probe(self):
+    metrics = \
+      sorted(select_metrics(self._client, self._label_filter),
+             key=operator.attrgetter("pod_name"))
+
+    # Hawkular does not support relative timestamps, hence the need for the
+    # server server time
+    # https://issues.jboss.org/browse/HWKMETRICS-358
+    #
+    server_now = self._client.get("").server_time
+
+    result = []
+
+    for i in metrics:
+      result.extend(get_metrics(self._client, server_now, self._interval, i))
+
+    return result
+
+
+@nagiosplugin.guarded
+def main():
+  parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+  vshn_npo.hawkular_client.setup_argument_parser(parser)
+  hawkular_utils.add_label_filter_argument(parser)
+  parser.add_argument("-v", "--verbose", action="count", default=0,
+                      help="Increase output verbosity")
+  parser.add_argument("--interval", metavar="WARN", type=int,
+                      default=(5 * _MIN_INTERVAL),
+                      help=("Measurement interval; use maximum over"
+                            " given number of seconds"))
+  parser.add_argument("--limit-warning", metavar="WARN", type=int, default=None,
+                      help=("Return warning if memory usage is larger than WARN"
+                            " percent of its limit (applies only when limits are"
+                            " set for a pod)"))
+  parser.add_argument("--limit-critical", metavar="CRIT", type=int, default=None,
+                      help="See `--limit-warning`, but return critical.")
+  args = parser.parse_args()
+
+  if args.interval < _MIN_INTERVAL:
+    parser.error("Interval must be at least {} seconds".format(_MIN_INTERVAL))
+
+  client = vshn_npo.hawkular_client.make_client(args)
+
+  label_filter = hawkular_utils.LabelFilter(args.selector.dict().items())
+
+  check = nagiosplugin.Check(
+      MemStats(client, label_filter, args.interval),
+      nagiosplugin.ScalarContext("mem-limit-usage", args.limit_warning,
+        args.limit_critical),
+      nagiosutils.FullSummary(),
+      )
+  check.main(verbose=args.verbose, timeout=None)
+
+
+if __name__ == "__main__":
+  main()
+
+# vim: set sw=2 sts=2 et :
