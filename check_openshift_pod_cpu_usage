@@ -29,50 +29,37 @@ class ContainerMetrics(collections.namedtuple("ContainerMetrics", [
 
 
 def select_metrics(client, label_filter):
-  # TODO: Filter on type=pod_container instead of container_name once
-  # Hawkular-Metrics 0.8.2 or newer is used on all clusters
-  metrics = client.get("metrics", tags={
-    "descriptor_name": "cpu/usage",
-    "container_name": ".*",
-    })
+  tags = {
+      "descriptor_name": "cpu/usage",
 
-  result = []
+      # TODO: Filter on type=pod_container instead of container_name once
+      # Hawkular-Metrics 0.8.2 or newer is used on all clusters
+      "container_name": ".*",
+      }
 
-  if metrics.data:
-    for i in metrics.data:
-      # TODO: Filter metrics directly in the query (difficult with Hawkular
-      # 0.8, hence not yet implemented)
-      if not label_filter.want_metric(i):
-        continue
+  for i in hawkular_utils.select_metrics(client, label_filter, tags):
+    cpu_usage_metric_id = i["id"]
 
-      cpu_usage_metric_id = i["id"]
+    try:
+      pod_name = i["tags"]["pod_name"]
+    except KeyError:
+      pod_name = "unknown-{}".format(cpu_usage_metric_id)
 
-      try:
-        pod_name = i["tags"]["pod_name"]
-      except KeyError:
-        pod_name = "unknown-{}".format(cpu_usage_metric_id)
+    # Per-pod metrics have no container name
+    container_name = i["tags"].get("container_name", "")
 
-      # Per-pod metrics have no container name
-      container_name = i["tags"].get("container_name", "")
+    # Assume ID ends with given string; a better implementation, though
+    # resulting in more API calls, would use a filter using "pod_id" and
+    # "descriptor_name" to retrieve the metric ID.
+    assert cpu_usage_metric_id.endswith("/cpu/usage")
 
-      # Assume ID ends with given string; a better implementation, though
-      # resulting in more API calls, would use a filter using "pod_id" and
-      # "descriptor_name" to retrieve the metric ID.
-      assert cpu_usage_metric_id.endswith("/cpu/usage")
+    uptime_metric_id = "{}uptime".format(cpu_usage_metric_id[:-9])
+    cpu_limit_metric_id = "{}cpu/limit".format(cpu_usage_metric_id[:-9])
 
-      uptime_metric_id = "{}uptime".format(cpu_usage_metric_id[:-9])
-      cpu_limit_metric_id = "{}cpu/limit".format(cpu_usage_metric_id[:-9])
-
-      tmp = ContainerMetrics(pod_name=pod_name, container_name=container_name,
-        uptime_metric_id=uptime_metric_id,
-        cpu_usage_metric_id=cpu_usage_metric_id,
-        cpu_limit_metric_id=cpu_limit_metric_id)
-
-      result.append(tmp)
-
-    result.sort()
-
-  return result
+    yield ContainerMetrics(pod_name=pod_name, container_name=container_name,
+      uptime_metric_id=uptime_metric_id,
+      cpu_usage_metric_id=cpu_usage_metric_id,
+      cpu_limit_metric_id=cpu_limit_metric_id)
 
 
 def get_bucket(client, path, duration, params):
@@ -169,7 +156,7 @@ class CpuUsage(nagiosplugin.Resource):
     self._interval = interval
 
   def probe(self):
-    metrics = select_metrics(self._client, self._label_filter)
+    metrics = sorted(select_metrics(self._client, self._label_filter))
 
     # Hawkular does not support relative timestamps, hence the need for the
     # server server time

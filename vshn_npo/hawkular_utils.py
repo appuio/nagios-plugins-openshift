@@ -63,4 +63,15 @@ class LabelFilter:
     # "special characters".
     return bool(frozenset(labels.split(",")) & self._wanted)
 
+
+def select_metrics(client, label_filter, tags):
+  metrics = client.get("metrics", tags=tags)
+
+  if metrics.data:
+    for i in metrics.data:
+      # TODO: Filter metrics directly in the query (difficult with Hawkular
+      # 0.8, hence not yet implemented)
+      if label_filter.want_metric(i):
+        yield i
+
 # vim: set sw=2 sts=2 et :
