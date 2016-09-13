@@ -1,0 +1,93 @@
+#!/bin/bash
+
+set -e -u -o pipefail
+
+. /usr/lib/nagios-plugins-openshift/utils
+
+default_namespace=default
+
+usage() {
+  echo "Usage: $0 -f <path> [-n <namespace>] [-s <selector>]"
+  echo
+  echo 'Check whether all pods matching given selector are running'\
+    'on disparate nodes'
+  echo
+  echo 'Options:'
+  echo ' -f   Config file path'
+  echo " -n   Namespace (default: \"$default_namespace\")"
+  echo ' -s   Selector for pods, e.g. "deploymentconfig=router"'
+}
+
+opt_cfgfile=
+opt_namespace=$default_namespace
+opt_selector=
+
+while getopts 'hf:n:s:w:c:' opt; do
+  case "$opt" in
+    h)
+      usage
+      exit 0
+      ;;
+    f) opt_cfgfile="$OPTARG" ;;
+    n) opt_namespace="$OPTARG" ;;
+    s) opt_selector="$OPTARG" ;;
+    *)
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+shift $((OPTIND - 1))
+
+if [[ "$#" -gt 0 ]]; then
+  usage >&2
+  exit 1
+fi
+
+if [[ -z "$opt_cfgfile" ]]; then
+  usage >&2
+  exit 1
+fi
+
+tmpdir=$(mktemp -d)
+trap 'rm -rf "$tmpdir"' EXIT
+
+# Capture stderr in variable and redirect stdout to file
+# shellcheck disable=SC2069
+if ! msg=$(run_oc "$opt_cfgfile" get pod \
+             --output=json \
+             --namespace="$opt_namespace" \
+             --selector="$opt_selector" \
+             2>&1 >"$tmpdir/pod.json"); then
+  echo "$msg"
+  exit "$state_critical"
+fi
+
+jq -r '
+  .items |
+  map(select(.status.conditions[] | select(.type == "Ready") | .status == "True")) |
+  group_by(.spec.nodeName) |
+  map([.[0].spec.nodeName, .[].metadata.name]) |
+  .[] |
+  @sh
+' < "$tmpdir/pod.json" > "$tmpdir/pod.txt"
+
+exit_status="$state_ok"
+output=()
+
+while read line; do
+  eval "set -- $line"
+
+  if [[ "$#" -gt 2 ]]; then
+    # First element is node name
+    output+=( "two or more instances running on $1 (${*:1})" )
+    exit_status=$(merge_status "$exit_status" "$state_critical")
+  fi
+done < "$tmpdir/pod.txt"
+
+finish "$exit_status" \
+  "$(join_args ', ' ${output[@]+"${output[@]}"})" \
+  ''
+
+# vim: set sw=2 sts=2 et :
