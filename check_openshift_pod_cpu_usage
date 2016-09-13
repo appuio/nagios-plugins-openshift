@@ -189,7 +189,7 @@ def main():
                       help="Return critical if CPU usage exceeds CRIT percent")
   parser.add_argument("--limit-warning", metavar="WARN", type=int, default=None,
                       help=("Return warning if CPU usage is larger than WARN"
-                            " percent of its limit (works only when limits are"
+                            " percent of its limit (applies only when limits are"
                             " set for a pod)"))
   parser.add_argument("--limit-critical", metavar="CRIT", type=int, default=None,
                       help="See `--limit-warning`, but return critical.")
