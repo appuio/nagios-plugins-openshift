@@ -8,6 +8,7 @@ import nagiosplugin
 
 import vshn_npo.hawkular_client
 from vshn_npo import nagiosutils
+from vshn_npo import hawkular_utils
 
 from vshn_npo.hawkular_client import idquote as idquote
 
@@ -34,27 +35,6 @@ class SelectorArg:
 
   def dict(self):
     return self._sel
-
-
-class LabelFilter:
-  def __init__(self, wanted):
-    self._wanted = \
-        frozenset("{}:{}".format(key, value)
-                  for (key, value) in wanted)
-
-  def want_metric(self, metric):
-    if not self._wanted:
-      return True
-
-    try:
-      labels = metric["tags"]["labels"]
-    except KeyError:
-      return False
-
-    # TODO: Decode labels from metric into individual parts (including undoing
-    # escape sequences). The current implementation assumes there being no
-    # "special characters".
-    return bool(frozenset(labels.split(",")) & self._wanted)
 
 
 class ContainerMetrics(collections.namedtuple("ContainerMetrics", [
@@ -254,8 +234,10 @@ def main():
 
   client = vshn_npo.hawkular_client.make_client(args)
 
+  label_filter = hawkular_utils.LabelFilter(args.selector.dict().items())
+
   check = nagiosplugin.Check(
-      CpuUsage(client, LabelFilter(args.selector.dict().items()), args.interval),
+      CpuUsage(client, label_filter, args.interval),
       nagiosplugin.ScalarContext("cpu-usage", args.warning, args.critical),
       nagiosplugin.ScalarContext("cpu-limit-usage", args.limit_warning, args.limit_critical),
       nagiosutils.FullSummary(),
