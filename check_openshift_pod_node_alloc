@@ -81,7 +81,7 @@ while read line; do
 
   if [[ "$#" -gt 2 ]]; then
     # First element is node name
-    output+=( "two or more instances running on $1 (${*:1})" )
+    output+=( "two or more instances running on $1 (${*:2})" )
     exit_status=$(merge_status "$exit_status" "$state_critical")
   fi
 done < "$tmpdir/pod.txt"
