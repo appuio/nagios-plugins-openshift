@@ -60,6 +60,7 @@ class HawkularClient(object):
     self._token = None
     self._timeout = None
     self._retries = 1
+    self._session = requests.Session()
 
   @property
   def endpoint(self):
@@ -134,7 +135,7 @@ class HawkularClient(object):
         time.sleep(delay)
 
       try:
-        req = requests.get(url, headers=headers, params=params, timeout=self._timeout)
+        req = self._session.get(url, headers=headers, params=params, timeout=self._timeout)
       except requests.exceptions.Timeout as err:
         if attempt < self._retries:
           logging.debug("Connection timed out: %s", err)
