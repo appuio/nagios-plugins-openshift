@@ -166,7 +166,7 @@ class MemStats(nagiosplugin.Resource):
     # server server time
     # https://issues.jboss.org/browse/HWKMETRICS-358
     #
-    server_now = self._client.get("").server_time
+    server_now = self._client.get("status").server_time
 
     result = []
 

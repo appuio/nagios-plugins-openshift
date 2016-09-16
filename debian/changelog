@@ -1,3 +1,11 @@
+nagios-plugins-openshift (0.9.15) trusty; urgency=medium
+
+  * check_openshift_pod_memory, check_openshift_pod_cpu_usage: Use URL
+    returning JSON instead of HTML when determining server time.
+  * check_openshift_pod_node_alloc: Remove redundant node name from output.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Fri, 16 Sep 2016 10:58:16 +0200
+
 nagios-plugins-openshift (0.9.14) trusty; urgency=medium
 
   * Add script checking whether pods matching selector run on disparate nodes.
