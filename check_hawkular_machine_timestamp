@@ -8,6 +8,7 @@ import time
 import nagiosplugin
 
 import vshn_npo.hawkular_client
+from vshn_npo import utils
 
 
 class Timestamp(nagiosplugin.Resource):
@@ -104,8 +105,7 @@ class TimestampContext(nagiosplugin.Context):
 def main():
   parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
   vshn_npo.hawkular_client.setup_argument_parser(parser)
-  parser.add_argument("-v", "--verbose", action="count", default=0,
-                      help="Increase output verbosity")
+  utils.add_verbose_argument(parser)
   parser.add_argument("-m", "--machine", required=True, help="Machine name")
   parser.add_argument("-w", "--warning", metavar="WARN", type=int, default=None,
                       help=("Return warning if machine status is older than"
@@ -119,6 +119,8 @@ def main():
 
   if not limits:
     parser.error("--warning and/or --critical are required")
+
+  utils.setup_basic_logging(args.verbose)
 
   # Retain a notion of the current time to base all calculations on
   now = int(time.time())

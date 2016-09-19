@@ -119,4 +119,21 @@ def NagiosOutputFile(nagios_output):
     fh.write("\n")
     fh.flush()
 
+
+def add_verbose_argument(parser):
+  parser.add_argument("-v", "--verbose", action="count", default=0,
+                      help="Increase output verbosity")
+
+
+def setup_basic_logging(verbose):
+  if verbose > 1:
+    level = logging.NOTSET
+  elif verbose:
+    level = logging.INFO
+  else:
+    level = logging.CRITICAL
+
+  logging.basicConfig(level=level)
+
+
 # vim: set sw=2 sts=2 et :

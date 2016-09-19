@@ -7,6 +7,7 @@ import re
 from vshn_npo import constants
 from vshn_npo import nagiosutils
 from vshn_npo import oc_client
+from vshn_npo import utils
 
 
 RES_NAMES = \
@@ -116,8 +117,7 @@ def _convert_ranges(values):
 @nagiosplugin.guarded
 def main():
   parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-  parser.add_argument("-v", "--verbose", action="count", default=0,
-                      help="Increase output verbosity")
+  utils.add_verbose_argument(parser)
   parser.add_argument("--oc", type=str, default=constants.DEFAULT_OC_BINARY,
                       help="Path to OpenShift client binary")
   parser.add_argument("--config", type=str, default=None,
@@ -130,6 +130,8 @@ def main():
                       type=_parse_range, action="append",
                       help="Critical if named value is outside given range")
   args = parser.parse_args()
+
+  utils.setup_basic_logging(args.verbose)
 
   client = oc_client.Client(args.oc, args.config)
 

@@ -5,6 +5,7 @@ import nagiosplugin
 import requests
 
 from vshn_npo import constants
+from vshn_npo import utils
 
 
 def _bytes_to_mb(value):
@@ -53,8 +54,7 @@ class StatsQuery(nagiosplugin.Resource):
 @nagiosplugin.guarded
 def main():
   parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-  parser.add_argument("-v", "--verbose", action="count", default=0,
-                      help="Increase output verbosity")
+  utils.add_verbose_argument(parser)
   parser.add_argument("--fs-used-warn", metavar="RANGE",
                       help="Warn if consumed disk space is above given percentage")
   parser.add_argument("--fs-used-critical", metavar="RANGE",
@@ -71,6 +71,8 @@ def main():
                               " authentication"))
 
   args = parser.parse_args()
+
+  utils.setup_basic_logging(args.verbose)
 
   if args.token_from is not None:
     token = args.token_from.read().rstrip()

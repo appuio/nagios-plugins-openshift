@@ -8,6 +8,7 @@ import nagiosplugin
 
 import vshn_npo.hawkular_client
 from vshn_npo import nagiosutils
+from vshn_npo import utils
 from vshn_npo import hawkular_utils
 
 from vshn_npo.hawkular_client import idquote as idquote
@@ -181,8 +182,7 @@ def main():
   parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
   vshn_npo.hawkular_client.setup_argument_parser(parser)
   hawkular_utils.add_label_filter_argument(parser)
-  parser.add_argument("-v", "--verbose", action="count", default=0,
-                      help="Increase output verbosity")
+  utils.add_verbose_argument(parser)
   parser.add_argument("--interval", metavar="WARN", type=int,
                       default=(5 * _MIN_INTERVAL),
                       help=("Measurement interval; use maximum over"
@@ -197,6 +197,8 @@ def main():
 
   if args.interval < _MIN_INTERVAL:
     parser.error("Interval must be at least {} seconds".format(_MIN_INTERVAL))
+
+  utils.setup_basic_logging(args.verbose)
 
   client = vshn_npo.hawkular_client.make_client(args)
 
