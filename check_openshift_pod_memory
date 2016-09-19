@@ -5,6 +5,7 @@ import operator
 import collections
 import time
 import nagiosplugin
+import logging
 
 import vshn_npo.hawkular_client
 from vshn_npo import nagiosutils
@@ -110,6 +111,7 @@ def get_metrics(client, server_now, interval, info):
         })
 
   if not usage_bucket:
+    logging.info("No memory usage data for pod %s", info.pod_name)
     return
 
   max_usage = round(usage_bucket["max"])

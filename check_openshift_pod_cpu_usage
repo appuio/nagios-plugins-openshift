@@ -5,6 +5,7 @@ import operator
 import collections
 import time
 import nagiosplugin
+import logging
 
 import vshn_npo.hawkular_client
 from vshn_npo import nagiosutils
@@ -105,7 +106,7 @@ def calc_usage(client, server_now, interval, container):
     })
 
   if not uptime_bucket:
-    # Not running or no data
+    logging.info("No CPU usage data for pod %s", info.pod_name)
     return
 
   params = {
