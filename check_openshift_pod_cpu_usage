@@ -106,7 +106,7 @@ def calc_usage(client, server_now, interval, container):
     })
 
   if not uptime_bucket:
-    logging.info("No CPU usage data for pod %s", info.pod_name)
+    logging.info("No CPU usage data for pod %s", container.pod_name)
     return
 
   params = {
