@@ -7,6 +7,8 @@ set -e -u -o pipefail
 usage() {
   echo "Usage: $0 -f <path> -n <node>"
   echo
+  echo 'Check node conditions Ready and OutOfDisk.'
+  echo
   echo 'Options:'
   echo ' -f   Config file path'
   echo ' -n   Node name'
@@ -82,6 +84,7 @@ check_condition() {
   fi
 }
 
+# Important: Keep usage description synchronized with the list of conditions!
 check_condition Ready true
 check_condition OutOfDisk false
 
