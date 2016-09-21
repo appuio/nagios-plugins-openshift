@@ -1,0 +1,103 @@
+#!/bin/bash
+
+set -e -u -o pipefail
+
+. /usr/lib/nagios-plugins-openshift/utils
+
+usage() {
+  echo "Usage: $0 -f <path>"
+  echo
+  echo 'Options:'
+  echo ' -f   Config file path'
+}
+
+opt_cfgfile=
+
+while getopts 'hf:' opt; do
+  case "$opt" in
+    h)
+      usage
+      exit 0
+      ;;
+    f) opt_cfgfile="$OPTARG" ;;
+    *)
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+shift $((OPTIND - 1))
+
+if [[ -z "$opt_cfgfile" || "$#" -gt 0 ]]; then
+  usage >&2
+  exit 1
+fi
+
+tmpdir=$(mktemp -d)
+trap 'rm -rf "$tmpdir"' EXIT
+
+# Capture stderr in variable and redirect stdout to file
+# shellcheck disable=SC2069
+if ! msg=$(run_oc "$opt_cfgfile" get project \
+             --output=json \
+             --all-namespaces=true \
+             2>&1 >"$tmpdir/data.json"); then
+  echo "$msg"
+  exit "$state_critical"
+fi
+
+jq -r '.items[] |
+  @sh "name=\(.metadata.namespace + "/" + .metadata.name) phase=\(.status.phase)"
+  ' \
+  < "$tmpdir/data.json" > "$tmpdir/parsed.sh"
+
+exit_status="$state_ok"
+output=()
+metrics=()
+terminating=()
+
+declare -A phase_count=(
+  [active]=0
+  [terminating]=0
+  )
+
+while read line; do
+  eval "$line"
+
+  lc_phase="${phase,,*}"
+
+  let "++phase_count[$lc_phase]"
+
+  # https://github.com/kubernetes/kubernetes/blob/v1.3.4/pkg/api/v1/types.go#L2558
+  case "$lc_phase" in
+    active) ;;
+
+    terminating)
+      terminating+=( "$name" )
+      ;;
+
+    *)
+      output+=( "\"$name\" reports unknown phase \"$phase\"" )
+      exit_status=$(merge_status "$exit_status" "$state_warning")
+      ;;
+  esac
+done < "$tmpdir/parsed.sh"
+
+if [[ -n "${terminating[*]+${terminating[*]}}" ]]; then
+  output+=( "terminating: ${terminating[*]}" )
+  exit_status=$(merge_status "$exit_status" "$state_warning")
+fi
+
+if [[ -n "${!phase_count[*]}" ]]; then
+  for phase in "${!phase_count[@]}"; do
+    # http://docs.icinga.org/latest/en/perfdata.html#perfdata-format
+    metrics+=( "'$phase'=${phase_count[$phase]};;;0" )
+  done
+fi
+
+finish "$exit_status" \
+  "$(join_args ', ' ${output[@]+"${output[@]}"})" \
+  "${metrics[*]+${metrics[*]}}"
+
+# vim: set sw=2 sts=2 et :
