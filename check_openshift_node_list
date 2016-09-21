@@ -64,6 +64,7 @@ array_uniq expected ${expected[@]+"${expected[@]}"}
 array_sub missing nodes expected
 array_sub unexpected expected nodes
 
+# Expected nodes actually found
 array_and found nodes expected
 
 exit_status="$state_ok"
@@ -80,11 +81,18 @@ if [[ -n "${unexpected[*]+${unexpected[*]}}" ]]; then
 fi
 
 if [[ -n "${found[*]+${found[*]}}" ]]; then
-  output+=( "found: ${found[*]}")
+  output+=( "found: ${found[*]}" )
 fi
+
+# http://docs.icinga.org/latest/en/perfdata.html#perfdata-format
+metrics=(
+  "'nodecount'=${#nodes[@]};;;0"
+  "'missing'=${#missing[@]};;;0"
+  "'unexpected'=${#unexpected[@]};;;0;${#nodes[@]}"
+  )
 
 finish "$exit_status" \
   "$(join_args ', ' ${output[@]+"${output[@]}"})" \
-  ''
+  "${metrics[*]+${metrics[*]}}"
 
 # vim: set sw=2 sts=2 et :
