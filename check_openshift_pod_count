@@ -7,7 +7,8 @@ set -e -u -o pipefail
 default_namespace=default
 
 usage() {
-  echo "Usage: $0 -f <path> [-n <namespace>] [-s <selector>] [-w <number>] [-c <number>]"
+  echo "Usage: $0 -f <path> [-n <namespace>] [-N] [-s <selector>]"\
+    '[-w <number>] [-c <number>]'
   echo
   echo 'Check the number of pods reported as ready (see OpenShift documentation).'
   echo 'A selector may be used to restrict the pods taken into consideration.'
@@ -15,6 +16,7 @@ usage() {
   echo 'Options:'
   echo ' -f   Config file path'
   echo " -n   Namespace (default: \"$default_namespace\")"
+  echo ' -N   All namespaces; namespace is ignored even if specified'
   echo ' -s   Selector, e.g. "deploymentconfig=foobar"'
   echo ' -c   Minimum number of running pods'
   echo ' -w   Emit warning if the number of running pods is less than the given number'
@@ -22,11 +24,12 @@ usage() {
 
 opt_cfgfile=
 opt_namespace=$default_namespace
+opt_allns=
 opt_selector=
 opt_warn=
 opt_crit=
 
-while getopts 'hf:n:s:w:c:' opt; do
+while getopts 'hf:n:Ns:w:c:' opt; do
   case "$opt" in
     h)
       usage
@@ -34,6 +37,7 @@ while getopts 'hf:n:s:w:c:' opt; do
       ;;
     f) opt_cfgfile="$OPTARG" ;;
     n) opt_namespace="$OPTARG" ;;
+    N) opt_allns=yes ;;
     s) opt_selector="$OPTARG" ;;
     w)
       validate_integer "$OPTARG"
@@ -65,13 +69,20 @@ fi
 tmpfile=$(mktemp)
 trap 'rm -f "$tmpfile"' EXIT
 
+oc_args=(
+  --output=json
+  --selector="$opt_selector"
+  )
+
+if [[ -n "$opt_allns" ]]; then
+  oc_args+=( --all-namespaces )
+else
+  oc_args+=( --namespace="$opt_namespace" )
+fi
+
 # Capture stderr in variable and redirect stdout to file
 # shellcheck disable=SC2069
-if ! msg=$(run_oc "$opt_cfgfile" get pod \
-             --output=json \
-             --namespace="$opt_namespace" \
-             --selector="$opt_selector" \
-             2>&1 >"$tmpfile"); then
+if ! msg=$(run_oc "$opt_cfgfile" get pod "${oc_args[@]}" 2>&1 >"$tmpfile"); then
   echo "$msg"
   exit "$state_critical"
 fi
