@@ -58,7 +58,11 @@ metrics=()
 lost_claims=()
 pending_claims=()
 
-declare -A phase_count=()
+declare -A phase_count=(
+  [bound]=0
+  [pending]=0
+  [lost]=0
+  )
 
 while read line; do
   eval "$line"
