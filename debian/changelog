@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.9.16) trusty; urgency=medium
+
+  * Add "check_openshift_pod_status_count" to retrieve performance data with
+    pod status counts across cluster.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Thu, 22 Sep 2016 17:02:20 +0200
+
 nagios-plugins-openshift (0.9.15) trusty; urgency=medium
 
   * check_openshift_pod_memory, check_openshift_pod_cpu_usage: Use URL

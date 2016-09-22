@@ -1,0 +1,145 @@
+#!/usr/bin/python3
+
+import argparse
+import collections
+import logging
+import nagiosplugin
+import re
+
+from vshn_npo import constants
+from vshn_npo import nagiosutils
+from vshn_npo import oc_client
+from vshn_npo import utils
+
+
+def _find_column_pos(line, name):
+  """Determine start and end of column.
+
+  """
+  m = re.search(r"\b({})\s+(\w)".format(re.escape(name)), line)
+  if not m:
+    msg = "Position of column \"{}\" not found".format(name)
+    raise nagiosplugin.CheckError(msg)
+
+  return (m.start(1), m.start(2))
+
+
+def _extract_values(lines):
+  (ready_start, ready_end) = _find_column_pos(lines[0], "READY")
+  (status_start, status_end) = _find_column_pos(lines[0], "STATUS")
+
+  for i in lines[1:]:
+    ready = i[ready_start:ready_end].rstrip()
+    status = i[status_start:status_end].rstrip()
+
+    ready_parts = ready.split("/", 1)
+
+    yield (int(ready_parts[0]), int(ready_parts[1]), status)
+
+
+_STATUS_CAT_COMPLETED = "Completed"
+_STATUS_CAT_ERROR = "Error"
+_STATUS_CAT_INIT_ERROR = "InitError"
+_STATUS_CAT_RUNNING = "Running"
+_STATUS_CAT_TERMINATING = "Terminating"
+_STATUS_CAT_IMAGEPULLBACKOFF = "ImagePullBackOff"
+_STATUS_CAT_CONTAINERCREATING = "ContainerCreating"
+_STATUS_CAT_CRASHLOOPBACKOFF = "CrashLoopBackOff"
+_STATUS_CAT_UNRECOGNIZED = "Unrecognized"
+
+
+# Status categories for performance data
+_STATUS_CATEGORY_NAMES = frozenset([
+  _STATUS_CAT_COMPLETED,
+  _STATUS_CAT_CONTAINERCREATING,
+  _STATUS_CAT_CRASHLOOPBACKOFF,
+  _STATUS_CAT_ERROR,
+  _STATUS_CAT_IMAGEPULLBACKOFF,
+  _STATUS_CAT_INIT_ERROR,
+  _STATUS_CAT_RUNNING,
+  _STATUS_CAT_TERMINATING,
+  _STATUS_CAT_UNRECOGNIZED,
+  ])
+
+
+# Status names without special handling
+_STATUS_CAT_MAP = \
+    dict((i.lower(), i) for i in [
+      _STATUS_CAT_COMPLETED,
+      _STATUS_CAT_CONTAINERCREATING,
+      _STATUS_CAT_CRASHLOOPBACKOFF,
+      _STATUS_CAT_ERROR,
+      _STATUS_CAT_IMAGEPULLBACKOFF,
+      _STATUS_CAT_RUNNING,
+      _STATUS_CAT_TERMINATING,
+      ])
+
+
+def _categorize_status(status):
+  lc_status = status.lower()
+
+  if lc_status.startswith("init:"):
+    return _STATUS_CAT_INIT_ERROR
+
+  if lc_status in _STATUS_CAT_MAP:
+    return _STATUS_CAT_MAP[lc_status]
+
+  logging.info("Status \"%s\" not recognized", status)
+
+  return _STATUS_CAT_UNRECOGNIZED
+
+
+
+class PodStatusCount(nagiosplugin.Resource):
+  def __init__(self, client):
+    self._client = client
+
+  def probe(self):
+    output = self._client.capture_output([
+      "get", "pod", "--all-namespaces", "--show-all",
+      ])
+
+    status_counter = collections.Counter()
+    ready_containers = 0
+    total_containers = 0
+
+    for (ready_count, total_count, status) in _extract_values(output.splitlines()):
+      cat = _categorize_status(status)
+      assert cat in _STATUS_CATEGORY_NAMES
+      status_counter[cat] += 1
+      ready_containers += ready_count
+      total_containers += total_count
+
+    yield nagiosplugin.Metric("count-ready-containers", ready_containers, min=0, context="default")
+    yield nagiosplugin.Metric("count-total-containers", total_containers, min=0, context="default")
+
+    for i in sorted(_STATUS_CATEGORY_NAMES):
+      yield nagiosplugin.Metric("status-{}".format(i), status_counter[i], min=0, context="default")
+
+
+@nagiosplugin.guarded
+def main():
+  parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+  utils.add_verbose_argument(parser)
+  parser.add_argument("--oc", type=str, default=constants.DEFAULT_OC_BINARY,
+                      help="Path to OpenShift client binary")
+  parser.add_argument("--config", type=str, default=None,
+                      help="Configuration file with login credentials")
+  args = parser.parse_args()
+
+  utils.setup_basic_logging(args.verbose)
+
+  client = oc_client.Client(args.oc, args.config)
+
+  checks = [
+      PodStatusCount(client),
+      nagiosutils.FullSummary(),
+      ]
+
+  nagiosplugin.Check(*checks).main(verbose=args.verbose, timeout=None)
+
+
+if __name__ == "__main__":
+  main()
+
+# vim: set sw=2 sts=2 et :
