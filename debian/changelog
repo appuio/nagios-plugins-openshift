@@ -2,6 +2,12 @@ nagios-plugins-openshift (0.9.16) trusty; urgency=medium
 
   * Add "check_openshift_pod_status_count" to retrieve performance data with
     pod status counts across cluster.
+  * Implement more verbose logging in script written using Python.
+  * check_openshift_pod_count: Support checking all namespaces.
+  * check_openshift_pvc_phase: Emit performance data for known phases even if
+    they're zero.
+  * Add "check_openshift_project_phase" emitting phase counts for projects.
+  * check_openshift_node_list: Emit performance data with node counts.
 
  -- Michael Hanselmann <hansmi@vshn.ch>  Thu, 22 Sep 2016 17:02:20 +0200
 
