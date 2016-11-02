@@ -1,3 +1,12 @@
+nagios-plugins-openshift (0.9.18) trusty; urgency=medium
+
+  * check_openshift_pod_status_count: Recognize "DeadlineExceeded" pod status.
+  * check_openshift_pod_cpu_usage, check_openshift_pod_memory: Remove
+    workaround for Hawkular-Metrics versions before 0.8.2, fixing the
+    “KeyError: 'tags'” error encountered with empty metrics in the process.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Wed, 02 Nov 2016 10:13:20 +0100
+
 nagios-plugins-openshift (0.9.16) trusty; urgency=medium
 
   * Add "check_openshift_pod_status_count" to retrieve performance data with
