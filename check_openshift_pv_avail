@@ -17,6 +17,12 @@ usage() {
   echo ' -l   The following limits apply to the given label and value (limits may'
   echo '      be unset); matching volumes are not considered for the generic or any'
   echo '      label-specific limits specified later (i.e. the first match applies)'
+  echo ' -W   Exit with WARNING status if the number of failed volumes is larger'
+  echo '      than or equal to the given number. This is a global limit and not'
+  echo '      part of the label-specific limits.'
+  echo ' -C   Exit with CRITICAL status if the number of failed volumes is larger'
+  echo '      than or equal to the given number. This is a global limit and not'
+  echo '      part of the label-specific limits.'
   echo
   echo 'Examples:'
   echo " $0 -w 10"
@@ -31,6 +37,8 @@ opt_cfgfile=
 opt_label=
 opt_warn=
 opt_crit=
+opt_failed_warn=
+opt_failed_crit=
 
 limits=()
 default_limits=
@@ -46,7 +54,7 @@ push_limit() {
   fi
 }
 
-while getopts 'hf:w:c:l:' opt; do
+while getopts 'hf:w:c:l:W:C:' opt; do
   case "$opt" in
     h)
       usage
@@ -71,6 +79,14 @@ while getopts 'hf:w:c:l:' opt; do
       opt_label="$OPTARG"
       opt_warn=
       opt_crit=
+      ;;
+    W)
+      validate_integer "$OPTARG"
+      opt_failed_warn="$OPTARG"
+      ;;
+    C)
+      validate_integer "$OPTARG"
+      opt_failed_crit="$OPTARG"
       ;;
     *)
       usage >&2
@@ -121,6 +137,8 @@ filter_volumes() {
   local label=
   local value=
   local uidfilter=
+
+  # TODO: Switch to --argfile instead of trying to compose proper jq code
 
   for uid; do
     if [[ -n "$uidfilter" ]]; then
@@ -221,6 +239,36 @@ filter_volumes '' ${processed[@]+"${processed[@]}"} \
 
 IFS=';' read warn crit _ <<< "$default_limits"
 check '' "$warn" "$crit" < "$tmpdir/matching.json"
+
+check_unavail() {
+  local failed=$(
+    jq -r '
+      .items |
+      map(select((
+        .status.phase == "Bound" or
+        .status.phase == "Available"
+        ) | not)) |
+      map(.metadata.name + " is " + .status.phase +
+          (if .status.message then " (" + .status.message + ")" else "" end)) |
+      @sh
+    ' < "$tmpdir/pv.json"
+    )
+
+  # Convert to array
+  eval "failed=( ${failed} )"
+
+  if [[ -n "${failed[*]+${#failed[*]}}" ]]; then
+    output+=( ${failed[@]+"${failed[@]}"} )
+
+    if [[ -n "$opt_failed_crit" && "${#failed[@]}" -ge "$opt_failed_crit" ]]; then
+      exit_status=$(merge_status "$exit_status" "$state_critical")
+    elif [[ -n "$opt_failed_warn" && "${#failed[@]}" -ge "$opt_failed_warn" ]]; then
+      exit_status=$(merge_status "$exit_status" "$state_warning")
+    fi
+  fi
+}
+
+check_unavail
 
 finish "$exit_status" \
   "$(join_args ', ' ${output[@]+"${output[@]}"})" \

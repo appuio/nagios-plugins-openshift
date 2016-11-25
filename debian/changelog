@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.9.19) trusty; urgency=medium
+
+  * check_openshift_pv_avail: Report on unbound, yet unavailable volumes (e.g.
+    failed or released)
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Fri, 25 Nov 2016 18:31:54 +0100
+
 nagios-plugins-openshift (0.9.18) trusty; urgency=medium
 
   * check_openshift_pod_status_count: Recognize "DeadlineExceeded" pod status.
