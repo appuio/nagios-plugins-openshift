@@ -7,6 +7,7 @@ set -e -u -o pipefail
 usage() {
   echo "Usage: $0 -f <path> [-w <warn>] [-c <crit>]"
   echo '          [-l <label>=<value> [-w <warn>] [-c <crit>] ...]'
+  echo '          [-s <capacity> [-w <warn>] [-c <crit>] ...]'
   echo
   echo 'Options:'
   echo ' -f   Config file path'
@@ -14,15 +15,18 @@ usage() {
   echo '      given are available'
   echo ' -c   Exit with CRITICAL status if fewer physical volumes than the number'
   echo '      given are available'
-  echo ' -l   The following limits apply to the given label and value (limits may'
-  echo '      be unset); matching volumes are not considered for the generic or any'
-  echo '      label-specific limits specified later (i.e. the first match applies)'
+  echo ' -l   Select using label and value.'
+  echo ' -s   Select using volume capacity.'
   echo ' -W   Exit with WARNING status if the number of failed volumes is larger'
   echo '      than or equal to the given number. This is a global limit and not'
   echo '      part of the label-specific limits.'
   echo ' -C   Exit with CRITICAL status if the number of failed volumes is larger'
   echo '      than or equal to the given number. This is a global limit and not'
   echo '      part of the label-specific limits.'
+  echo
+  echo 'Volume selected using the "-l" or "-s" options are not considered for the'
+  echo 'generic or later selection-specific limits. The first selector matching a'
+  echo 'volume applies.'
   echo
   echo 'Examples:'
   echo " $0 -w 10"
@@ -31,10 +35,18 @@ usage() {
   echo '    Count volumes with the label "customer" set to "foocorp" separately and'
   echo '    warn if less than 50 are available. Fail if less than 33 volumes without'
   echo '    said label value are available.'
+  echo " $0 -w 10 -s 1Gi -w 3"
+  echo '    Warn if fewer than 3 volumes with a capacity of 1Gi are available or if'
+  echo '    fewer than 10 of other capacities are available.'
+  echo " $0 -l foo=bar -w 7 -s 100Gi"
+  echo '    Ignore volumes with a capacity of 100Gi (i.e. ignore them) unless they'
+  echo '    have a label "foo" with value "bar". A warning is emitted if fewer than'
+  echo '    7 volumes with label "foo" and value "bar" are available.'
 }
 
 opt_cfgfile=
 opt_label=
+opt_capacity=
 opt_warn=
 opt_crit=
 opt_failed_warn=
@@ -45,16 +57,17 @@ default_limits=
 
 push_limit() {
   local labelval="$1"; shift
+  local capacity="$1"; shift
   local joined=$(join_args ';' "$@")
 
-  if [[ -z "$labelval" ]]; then
+  if [[ -z "$labelval" && -z "$capacity" ]]; then
     default_limits="$joined"
   else
-    limits+=( "$labelval;$joined" )
+    limits+=( "$labelval;$capacity;$joined" )
   fi
 }
 
-while getopts 'hf:w:c:l:W:C:' opt; do
+while getopts 'hf:w:c:l:s:W:C:' opt; do
   case "$opt" in
     h)
       usage
@@ -75,8 +88,20 @@ while getopts 'hf:w:c:l:W:C:' opt; do
           'and a value' >&2
         exit "$state_critical"
       fi
-      push_limit "$opt_label" "$opt_warn" "$opt_crit"
+      push_limit "$opt_label" "$opt_capacity" "$opt_warn" "$opt_crit"
       opt_label="$OPTARG"
+      opt_capacity=
+      opt_warn=
+      opt_crit=
+      ;;
+    s)
+      if [[ "$OPTARG" != [0-9]* ]]; then
+        echo 'Capacity must start with number' >&2
+        exit "$state_critical"
+      fi
+      push_limit "$opt_label" "$opt_capacity" "$opt_warn" "$opt_crit"
+      opt_label=
+      opt_capacity="$OPTARG"
       opt_warn=
       opt_crit=
       ;;
@@ -95,7 +120,7 @@ while getopts 'hf:w:c:l:W:C:' opt; do
   esac
 done
 
-push_limit "$opt_label" "$opt_warn" "$opt_crit"
+push_limit "$opt_label" "$opt_capacity" "$opt_warn" "$opt_crit"
 
 shift $((OPTIND - 1))
 
@@ -130,10 +155,13 @@ metrics=()
 # Arguments:
 # - labelval: Empty string to select all volumes or "label=value" to select
 #     volumes with given label set to given value
+# - capacity: Empty string to select all capacities or value to select volumes
+#     with given capacity
 # - *args: Volume UIDs to exclude
 #
 filter_volumes() {
   local labelval="$1"; shift
+  local capacity="$1"; shift
   local label=
   local value=
   local uidfilter=
@@ -155,6 +183,10 @@ filter_volumes() {
   if [[ -n "$labelval" ]]; then
     IFS='=' read label value <<< "$labelval"
     jqfilter+=" | select(.metadata.labels | .[\"$label\"] == \"$value\")"
+  fi
+  if [[ -n "$capacity" ]]; then
+    # FIXME: Don't use string comparison to compare quantities
+    jqfilter+=" | select(.spec.capacity.storage == \"$capacity\")"
   fi
   jqfilter+=']'
 
@@ -190,7 +222,7 @@ calc_stats() {
 # Apply user-provided limits and calculate metrics
 #
 check() {
-  local labelval="$1" warn="$2" crit="$3"
+  local labelval="$1" capacity="$2" warn="$3" crit="$4"
   local status
 
   calc_stats > "$tmpdir/stats.txt"
@@ -222,23 +254,23 @@ check() {
 processed=()
 
 for line in ${limits[@]+"${limits[@]}"}; do
-  IFS=';' read labelval warn crit _ <<< "$line"
+  IFS=';' read labelval capacity warn crit _ <<< "$line"
 
   # Find matching disks
-  filter_volumes "$labelval" ${processed[@]+"${processed[@]}"} \
+  filter_volumes "$labelval" "$capacity" ${processed[@]+"${processed[@]}"} \
     < "$tmpdir/pv.json" > "$tmpdir/matching.json"
 
   processed+=( $(get_obj_uids < "$tmpdir/matching.json") )
 
-  check "$labelval" "$warn" "$crit" < "$tmpdir/matching.json"
+  check "$labelval" "$capacity" "$warn" "$crit" < "$tmpdir/matching.json"
 done
 
 # Process remaining volumes, i.e. those not explicitly requested by label value
-filter_volumes '' ${processed[@]+"${processed[@]}"} \
+filter_volumes '' '' ${processed[@]+"${processed[@]}"} \
   < "$tmpdir/pv.json" > "$tmpdir/matching.json"
 
 IFS=';' read warn crit _ <<< "$default_limits"
-check '' "$warn" "$crit" < "$tmpdir/matching.json"
+check '' '' "$warn" "$crit" < "$tmpdir/matching.json"
 
 check_unavail() {
   local failed=$(
