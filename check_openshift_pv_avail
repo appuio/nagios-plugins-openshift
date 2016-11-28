@@ -203,9 +203,9 @@ check() {
     # http://docs.icinga.org/latest/en/perfdata.html#perfdata-format
     metrics+=( "'${labelval:+${labelval//=/-}-}$capacity'=${used};${warn};${crit};0;${total}" )
 
-    if [[ -n "$crit" && "$total" -lt "$crit" ]]; then
+    if [[ -n "$crit" && "$avail" -lt "$crit" ]]; then
       status=$state_critical
-    elif [[ -n "$warn" && "$total" -lt "$warn" ]]; then
+    elif [[ -n "$warn" && "$avail" -lt "$warn" ]]; then
       status=$state_warning
     else
       status=$state_ok
