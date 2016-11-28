@@ -1,3 +1,16 @@
+nagios-plugins-openshift (0.9.20) trusty; urgency=medium
+
+  check_openshift_pv_avail:
+  * Fix bug whereby limits were compared against total number of volumes with
+    the same capacity instead of those available.
+  * Allow volumes to be selected by capacity, i.e. "check_openshift_pv_avail
+    -w 100 -s 100Gi -w 3"
+  * Remove flags "-W" and "-C". What's interesting is the number of available
+    physical volumes, not the number of failed volumes. Failed volumes (i.e.
+    released) are no issue so long as other volumes are available.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Mon, 28 Nov 2016 14:29:19 +0100
+
 nagios-plugins-openshift (0.9.19) trusty; urgency=medium
 
   * check_openshift_pv_avail: Report on unbound, yet unavailable volumes (e.g.
