@@ -13,7 +13,7 @@ def _bytes_to_mb(value):
   return int(round(value / (1024.0 * 1024), 0))
 
 
-def _FsStats(key, data):
+def _FsStats(suffix, data):
   # TODO: Monitor per-path space, not only globally
   allpaths = data["total"]
 
@@ -21,46 +21,47 @@ def _FsStats(key, data):
   totalmb = _bytes_to_mb(allpaths["total_in_bytes"])
   usedmb = totalmb - availmb
 
-  yield nagiosplugin.Metric("fs-used-{}".format(key), usedmb,
+  yield nagiosplugin.Metric("fs-used-{}".format(suffix), usedmb,
                             uom="MB", min=0, max=totalmb,
                             context="fs-used")
 
   usedperc = int(100.0 * usedmb / totalmb)
 
-  yield nagiosplugin.Metric("fs-used-percent-{}".format(key), usedperc,
+  yield nagiosplugin.Metric("fs-used-percent-{}".format(suffix), usedperc,
                             uom="%", min=0, max=100,
                             context="fs-used-percent")
 
 
-def _ProcessStats(key, data):
+def _ProcessStats(suffix, data):
   cpudata = data["cpu"]
 
-  yield nagiosplugin.Metric("process-cpu-percent-{}".format(key),
+  yield nagiosplugin.Metric("process-cpu-percent-{}".format(suffix),
                             cpudata["percent"],
                             uom="%", min=0,
                             context="process-cpu-percent")
 
 
-def _JvmStats(key, data):
+def _JvmStats(suffix, data):
   memdata = data["mem"]
 
   heap_max_mb = _bytes_to_mb(memdata["heap_max_in_bytes"])
   heap_used_mb = _bytes_to_mb(memdata["heap_used_in_bytes"])
 
-  yield nagiosplugin.Metric("jvm-heap-used-{}".format(key), heap_used_mb,
+  yield nagiosplugin.Metric("jvm-heap-used-{}".format(suffix), heap_used_mb,
                             uom="MB", min=0, max=heap_max_mb,
                             context="jvm-heap-used")
 
-  yield nagiosplugin.Metric("jvm-heap-used-percent-{}".format(key),
+  yield nagiosplugin.Metric("jvm-heap-used-percent-{}".format(suffix),
                             memdata["heap_used_percent"],
                             uom="%", min=0, max=100,
                             context="jvm-heap-used-percent")
 
 
 class StatsQuery(nagiosplugin.Resource):
-  def __init__(self, endpoint, token):
+  def __init__(self, endpoint, token, strip_hostname_prefix):
     self._endpoint = endpoint
     self._token = token
+    self._strip_hostname_prefix = strip_hostname_prefix
 
   def probe(self):
     url = "{}/_nodes/stats/fs,jvm,process".format(self._endpoint)
@@ -75,10 +76,18 @@ class StatsQuery(nagiosplugin.Resource):
 
     # Data structure documentation:
     # https://www.elastic.co/guide/en/elasticsearch/reference/2.4/cluster-nodes-stats.html#fs-info
-    for (key, node) in data["nodes"].items():
-      for i in itertools.chain(_FsStats(key, node["fs"]),
-                               _ProcessStats(key, node["process"]),
-                               _JvmStats(key, node["jvm"])):
+    for node in data["nodes"].values():
+      # In a cluster outside OpenShift there could be more than one
+      # Elasticsearch instance per host, but in OpenShift every container has
+      # its own name.
+      suffix = node["host"]
+
+      if suffix.startswith(self._strip_hostname_prefix):
+        suffix = suffix[len(self._strip_hostname_prefix):]
+
+      for i in itertools.chain(_FsStats(suffix, node["fs"]),
+                               _ProcessStats(suffix, node["process"]),
+                               _JvmStats(suffix, node["jvm"])):
         yield i
 
 
@@ -86,6 +95,9 @@ class StatsQuery(nagiosplugin.Resource):
 def main():
   parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
   utils.add_verbose_argument(parser)
+  parser.add_argument("--strip-hostname-prefix", metavar="PREFIX",
+                      default="logging-es-",
+                      help="Strip given prefix from node names")
   parser.add_argument("--fs-used-warn", metavar="RANGE",
                       help="Warn if consumed disk space is above given percentage")
   parser.add_argument("--fs-used-critical", metavar="RANGE",
@@ -119,7 +131,7 @@ def main():
     token = args.token
 
   checks = [
-      StatsQuery(args.endpoint, token),
+      StatsQuery(args.endpoint, token, args.strip_hostname_prefix),
       nagiosplugin.ScalarContext("fs-used"),
       nagiosplugin.ScalarContext("fs-used-percent",
                                  warning=args.fs_used_warn,
