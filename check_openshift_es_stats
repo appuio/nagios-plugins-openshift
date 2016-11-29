@@ -3,6 +3,7 @@
 import argparse
 import nagiosplugin
 import requests
+import itertools
 
 from vshn_npo import constants
 from vshn_npo import utils
@@ -12,13 +13,57 @@ def _bytes_to_mb(value):
   return int(round(value / (1024.0 * 1024), 0))
 
 
+def _FsStats(key, data):
+  # TODO: Monitor per-path space, not only globally
+  allpaths = data["total"]
+
+  availmb = _bytes_to_mb(allpaths["available_in_bytes"])
+  totalmb = _bytes_to_mb(allpaths["total_in_bytes"])
+  usedmb = totalmb - availmb
+
+  yield nagiosplugin.Metric("fs-used-{}".format(key), usedmb,
+                            uom="MB", min=0, max=totalmb,
+                            context="fs-used")
+
+  usedperc = int(100.0 * usedmb / totalmb)
+
+  yield nagiosplugin.Metric("fs-used-percent-{}".format(key), usedperc,
+                            uom="%", min=0, max=100,
+                            context="fs-used-percent")
+
+
+def _ProcessStats(key, data):
+  cpudata = data["cpu"]
+
+  yield nagiosplugin.Metric("process-cpu-percent-{}".format(key),
+                            cpudata["percent"],
+                            uom="%", min=0,
+                            context="process-cpu-percent")
+
+
+def _JvmStats(key, data):
+  memdata = data["mem"]
+
+  heap_max_mb = _bytes_to_mb(memdata["heap_max_in_bytes"])
+  heap_used_mb = _bytes_to_mb(memdata["heap_used_in_bytes"])
+
+  yield nagiosplugin.Metric("jvm-heap-used-{}".format(key), heap_used_mb,
+                            uom="MB", min=0, max=heap_max_mb,
+                            context="jvm-heap-used")
+
+  yield nagiosplugin.Metric("jvm-heap-used-percent-{}".format(key),
+                            memdata["heap_used_percent"],
+                            uom="%", min=0, max=100,
+                            context="jvm-heap-used-percent")
+
+
 class StatsQuery(nagiosplugin.Resource):
   def __init__(self, endpoint, token):
     self._endpoint = endpoint
     self._token = token
 
   def probe(self):
-    url = "{}/_nodes/stats/fs".format(self._endpoint)
+    url = "{}/_nodes/stats/fs,jvm,process".format(self._endpoint)
     headers = {
         "Authorization": "Bearer {}".format(self._token),
         }
@@ -31,24 +76,10 @@ class StatsQuery(nagiosplugin.Resource):
     # Data structure documentation:
     # https://www.elastic.co/guide/en/elasticsearch/reference/2.4/cluster-nodes-stats.html#fs-info
     for (key, node) in data["nodes"].items():
-      prefix = "node-{}".format(key)
-
-      # TODO: Monitor per-path space, not only globally
-      allpaths = node["fs"]["total"]
-
-      availmb = _bytes_to_mb(allpaths["available_in_bytes"])
-      totalmb = _bytes_to_mb(allpaths["total_in_bytes"])
-      usedmb = totalmb - availmb
-
-      yield nagiosplugin.Metric("fs-used-{}".format(key), usedmb,
-                                uom="MB", min=0, max=totalmb,
-                                context="fs-used")
-
-      usedperc = int(100.0 * usedmb / totalmb)
-
-      yield nagiosplugin.Metric("fs-used-percent-{}".format(key), usedperc,
-                                uom="%", min=0, max=100,
-                                context="fs-used-percent")
+      for i in itertools.chain(_FsStats(key, node["fs"]),
+                               _ProcessStats(key, node["process"]),
+                               _JvmStats(key, node["jvm"])):
+        yield i
 
 
 @nagiosplugin.guarded
@@ -59,6 +90,14 @@ def main():
                       help="Warn if consumed disk space is above given percentage")
   parser.add_argument("--fs-used-critical", metavar="RANGE",
                       help="Critical if consumed disk space is above given percentage")
+  parser.add_argument("--cpu-usage-warn", metavar="RANGE",
+                      help="Warn if CPU usage is above given percentage")
+  parser.add_argument("--cpu-usage-critical", metavar="RANGE",
+                      help="Critical if CPU usage is above given percentage")
+  parser.add_argument("--jvm-heap-used-warn", metavar="RANGE",
+                      help="Warn if JVM heap usage is above given percentage")
+  parser.add_argument("--jvm-heap-used-critical", metavar="RANGE",
+                      help="Critical if JVM heap usage is above given percentage")
 
   parser.add_argument("--endpoint", required=True, metavar="URL",
                       help="API endpoint")
@@ -81,10 +120,17 @@ def main():
 
   checks = [
       StatsQuery(args.endpoint, token),
+      nagiosplugin.ScalarContext("fs-used"),
       nagiosplugin.ScalarContext("fs-used-percent",
                                  warning=args.fs_used_warn,
                                  critical=args.fs_used_critical),
-      nagiosplugin.ScalarContext("fs-used"),
+      nagiosplugin.ScalarContext("process-cpu-percent",
+                                 warning=args.cpu_usage_warn,
+                                 critical=args.cpu_usage_critical),
+      nagiosplugin.ScalarContext("jvm-heap-used"),
+      nagiosplugin.ScalarContext("jvm-heap-used-percent",
+                                 warning=args.jvm_heap_used_warn,
+                                 critical=args.jvm_heap_used_critical),
       ]
 
   nagiosplugin.Check(*checks).main(verbose=args.verbose, timeout=None)
