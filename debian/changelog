@@ -1,3 +1,14 @@
+nagios-plugins-openshift (0.9.21) trusty; urgency=medium
+
+  check_openshift_es_stats:
+  * Use Elasticsearch hostname as unique identifier. Elasticsearch's internal
+    node name isn't easily mapped to a pod name in OpenShift and can't be
+    configured in the image provided by OpenShift.
+  * Check CPU and JVM heap usage, including parameters to apply limits
+    ("--cpu-usage-*", "--jvm-heap-used-*").
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Tue, 29 Nov 2016 13:00:10 +0100
+
 nagios-plugins-openshift (0.9.20) trusty; urgency=medium
 
   check_openshift_pv_avail:
