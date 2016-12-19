@@ -4,6 +4,7 @@ import argparse
 import nagiosplugin
 import requests
 import itertools
+import warnings
 
 from vshn_npo import constants
 from vshn_npo import utils
@@ -33,7 +34,12 @@ def _FsStats(suffix, data):
 
 
 def _ProcessStats(suffix, data):
-  cpudata = data["cpu"]
+  try:
+    cpudata = data["cpu"]
+  except KeyError:
+    # There is no good way to report non-fatal issues via the nagiosplugin module
+    warnings.warn("APPU-163: Missing CPU metrics", category=RuntimeWarning)
+    return
 
   yield nagiosplugin.Metric("process-cpu-percent-{}".format(suffix),
                             cpudata["percent"],

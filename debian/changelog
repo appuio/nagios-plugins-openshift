@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.9.22) trusty; urgency=medium
+
+  * check_openshift_es_stats: Warn when no CPU usage information is available
+    rather than failing.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Mon, 19 Dec 2016 16:38:24 +0100
+
 nagios-plugins-openshift (0.9.21) trusty; urgency=medium
 
   check_openshift_es_stats:
