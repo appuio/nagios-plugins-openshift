@@ -3,6 +3,7 @@
 
 export DH_VERBOSE=1
 export PYBUILD_NAME = vshn_npo
+export PYBUILD_DESTDIR_python3 = debian/nagios-plugins-openshift
 
 %:
 	dh $@ --with=python3 --buildsystem=pybuild

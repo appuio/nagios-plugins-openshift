@@ -22,3 +22,9 @@ Depends: ${misc:Depends}, ${python3:Depends}, bash,
  python3-nagiosplugin (>= 1.2),
  python3-requests (>= 2.2)
 Description: Nagios-compatible plugins to monitor OpenShift
+
+Package: nagios-plugins-openshift-config
+Architecture: all
+Depends: ${misc:Depends}, icinga2
+Conflicts: nagios-plugins-openshift (<< 0.10.0)
+Description: Icinga 2.x configuration for nagios-plugins-openshift

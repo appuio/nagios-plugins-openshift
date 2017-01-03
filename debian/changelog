@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.10.0) trusty; urgency=medium
+
+  * Add package with check command definitions for Icinga 2.
+  * Update package to work on Ubuntu Xenial.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Tue, 03 Jan 2017 12:40:37 +0100
+
 nagios-plugins-openshift (0.9.22) trusty; urgency=medium
 
   * check_openshift_es_stats: Warn when no CPU usage information is available
