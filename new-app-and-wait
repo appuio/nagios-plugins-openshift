@@ -143,10 +143,7 @@ def main():
     finally:
       collect_logs(cl)
 
-    try:
-      oc_client.delete_project(cl, project_name)
-    except Exception:
-      logging.exception("Ignored project deletion error")
+    oc_client.delete_project(cl, project_name, ignore_errors=True)
 
     if duration >= args.warning:
       code = constants.STATE_WARNING

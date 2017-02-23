@@ -159,8 +159,10 @@ def create_project(client, namer):
   return retry.Retry(3, functools.partial(inner, client, namer))
 
 
-def delete_project(client, name):
+def delete_project(client, name, ignore_errors=False):
   """Delete a project.
+
+  :param ignore_errors: Whether to ignore errors during project deletion.
 
   """
   client.run(["delete",
@@ -172,7 +174,7 @@ def delete_project(client, name):
 
     "project",
     name,
-    ])
+    ], ignore_errors=ignore_errors)
 
 
 def cleanup_projects(client, namer, named_max_age, max_age):
