@@ -1,3 +1,9 @@
+nagios-plugins-openshift (0.11.2) trusty; urgency=medium
+
+  * Add timestamp to Icinga output from end-to-end test.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Thu, 23 Feb 2017 15:26:08 +0100
+
 nagios-plugins-openshift (0.11.1) trusty; urgency=medium
 
   * Extend end-to-end test to retrieve test URL via all IP addresses listed in

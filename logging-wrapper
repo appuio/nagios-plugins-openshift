@@ -82,7 +82,8 @@ fi
 
   if [[ "$exitcode" > 0 ]]; then
     echo
-    echo "Logs are in \"$logdir\" on \"$(hostname -f || :)\""
+    echo "Logs are in \"$logdir\" on \"$(hostname -f || :)\"." \
+      "Finished at $(date +'%F %T%z')."
   fi
 } > "$tmpdir/status.txt"
 
