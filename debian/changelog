@@ -1,3 +1,9 @@
+nagios-plugins-openshift (0.11.0) trusty; urgency=medium
+
+  * Record logs after running end-to-end test.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Thu, 23 Feb 2017 11:14:31 +0100
+
 nagios-plugins-openshift (0.10.0) trusty; urgency=medium
 
   * Add package with check command definitions for Icinga 2.
