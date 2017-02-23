@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.11.3) trusty; urgency=medium
+
+  * Log output of "oc describe" in addition to "oc logs" for end-to-end
+    objects.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Thu, 23 Feb 2017 16:12:56 +0100
+
 nagios-plugins-openshift (0.11.2) trusty; urgency=medium
 
   * Add timestamp to Icinga output from end-to-end test.

@@ -162,13 +162,31 @@ def get_names(client, kind):
     ]).splitlines()
 
 
+def collect_logs_inner(client, kind, has_logs):
+  for name in sorted(get_names(client, kind)):
+    client.run(["describe", "--show-events", name], ignore_errors=True)
+
+    if has_logs:
+      logging.info("Logs for %r", name)
+      client.run(["logs", "--timestamps", name], ignore_errors=True)
+
+
 def collect_logs(client):
   client.run(["status", "-v"], ignore_errors=True)
 
-  for i in ["build", "dc", "rc", "pod"]:
-    for j in sorted(get_names(client, i)):
-      logging.info("Logs for %r", j)
-      client.run(["logs", "--timestamps", j], ignore_errors=True)
+  for kind in [
+      "build",
+      "deploymentconfig",
+      "replicationcontroller",
+      "pod",
+      ]:
+    collect_logs_inner(client, kind, True)
+
+  for kind in [
+      "service",
+      "route",
+      ]:
+    collect_logs_inner(client, kind, False)
 
 
 def main():
