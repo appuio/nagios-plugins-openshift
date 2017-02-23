@@ -64,6 +64,21 @@ def Check(client, args, timeout):
   return retry.wait_for_url(url, timeout.remaining, ctx=ctx)
 
 
+def get_names(client, kind):
+  return client.capture_output([
+    "get", "--no-headers", "--show-kind", "--output=name", kind,
+    ]).splitlines()
+
+
+def collect_logs(client):
+  client.run(["status", "-v"], ignore_errors=True)
+
+  for i in ["build", "dc", "rc", "pod"]:
+    for j in sorted(get_names(client, i)):
+      logging.info("Logs for %r", j)
+      client.run(["logs", "--timestamps", j], ignore_errors=True)
+
+
 def main():
   arg_formatter = argparse.ArgumentDefaultsHelpFormatter
   parser = argparse.ArgumentParser(formatter_class=arg_formatter)
@@ -126,7 +141,7 @@ def main():
     try:
       duration = Check(cl, args, timeout)
     finally:
-      cl.run(["status", "-v"])
+      collect_logs(cl)
 
     try:
       oc_client.delete_project(cl, project_name)

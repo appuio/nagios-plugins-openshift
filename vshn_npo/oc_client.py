@@ -107,11 +107,23 @@ class Client:
 
     return result
 
-  def run(self, args):
+  def run(self, args, ignore_errors=False):
+    """Run OpenShift client.
+
+    :param args: Arguments to pass to OpenShift client.
+    :param ignore_errors: Whether to ignore non-zero exit codes.
+
+    """
     cmd = self._make_base_cmd()
     cmd.extend(args)
     logging.debug("%r", cmd)
-    subprocess.check_call(cmd)
+
+    if ignore_errors:
+      fn = subprocess.call
+    else:
+      fn = subprocess.check_call
+
+    fn(cmd)
 
   def capture_output(self, args):
     cmd = self._make_base_cmd()
