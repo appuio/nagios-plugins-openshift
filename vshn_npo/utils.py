@@ -2,6 +2,7 @@ import contextlib
 import io
 import time
 import logging
+import random
 import re
 import sys
 
@@ -45,6 +46,24 @@ class Timeout:
 
     """
     return self.remaining < 0
+
+
+class Delayer:
+  def __init__(self, initial, max_):
+    self._delay = initial
+    self._max = max_
+
+  def sleep(self, remaining):
+    delay = max(1, min(self._delay * 1.25, remaining, self._max))
+
+    # Add a small amount of jitter
+    delay *= 0.9 + (0.2 * random.random())
+
+    self._delay = delay
+
+    logging.debug("Sleeping %0.1f seconds (%0.1f seconds remaining)", delay, remaining)
+
+    time.sleep(delay)
 
 
 class _Reporter:

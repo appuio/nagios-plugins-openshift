@@ -13,6 +13,7 @@ Homepage: https://git.vshn.net/vshn/nagios-plugins-openshift
 Package: nagios-plugins-openshift
 Architecture: all
 Depends: ${misc:Depends}, ${python3:Depends}, bash,
+ curl (>= 7.21.3),
  daemontools,
  nagios-plugins-basic,
  openshift-origin-client-tools (>= 1.4),
@@ -20,7 +21,8 @@ Depends: ${misc:Depends}, ${python3:Depends}, bash,
  jq (>= 1.4),
  python3 (>= 3.4),
  python3-nagiosplugin (>= 1.2),
- python3-requests (>= 2.2)
+ python3-requests (>= 2.2),
+ python3-urllib3 (>= 1.13)
 Description: Nagios-compatible plugins to monitor OpenShift
 
 Package: nagios-plugins-openshift-config

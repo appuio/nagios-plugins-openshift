@@ -5,12 +5,104 @@ import argparse
 import functools
 import logging
 import re
+import socket
+import subprocess
 import time
+import urllib3
 
 from vshn_npo import constants
 from vshn_npo import oc_client
 from vshn_npo import retry
 from vshn_npo import utils
+
+
+def capture_curl(url, options=None, curl_binary=constants.DEFAULT_CURL_BINARY):
+  cmd = [
+    curl_binary,
+    "--verbose",
+    "--silent",
+    "--show-error",
+    "--retry", "3",
+    "--max-time", "300",
+    ]
+
+  if options:
+    cmd.extend(options)
+
+  cmd.append(url)
+
+  logging.debug(cmd)
+  return subprocess.check_output(cmd).decode("UTF-8")
+
+
+def check_url_anyip(url, pattern, timeout):
+  """Check :param:`url` using all IP addresses returned for host.
+
+  Resolve the host for the given URL and attempt to retrieve the URL via all
+  returned IP addresses (IPv4 and IPv6). All requests must succeed and contain
+  the given pattern.
+
+  :param url: URL string
+  :param pattern: Compiled regular expression
+
+  """
+  tcalc = utils.Timeout(timeout)
+
+  parsed_url = urllib3.util.parse_url(url)
+
+  if parsed_url.port:
+    port = parsed_url.port
+  else:
+    port = urllib3.connection.port_by_scheme.get(parsed_url.scheme)
+
+  if not port:
+    raise Exception("Can't determine port for URL {!r}".format(url))
+
+  checks = []
+
+  addrinfo = socket.getaddrinfo(parsed_url.host, port, type=socket.SOCK_STREAM)
+
+  for (af, socktype, proto, _, sa) in addrinfo:
+    if af == socket.AF_INET:
+      (ipaddr, _) = sa
+    elif af == socket.AF_INET6:
+      (ipaddr, _, _, _) = sa
+    else:
+      raise Exception("Unsupported address family: {!r}".format(af))
+
+    opts = [
+        "--resolve", "{}:{}:{}".format(parsed_url.host, port, ipaddr),
+        "--max-time", "{}".format(int(max(10, min(300, tcalc.remaining)))),
+        ]
+
+    checks.append((ipaddr, url, opts))
+
+  delay = utils.Delayer(1.0, 30.0)
+
+  while checks:
+    failed = []
+
+    while checks:
+      (ipaddr, url, opts) = checks.pop()
+
+      logging.info("Retrieving %r from %r", url, ipaddr)
+
+      try:
+        text = capture_curl(url, options=opts)
+      except subprocess.CalledProcessError as err:
+        logging.error("Request error: %s", err)
+        failed.append((ipaddr, url, opts))
+      else:
+        if not pattern.search(text):
+          raise Exception("Expected pattern \"{}\" not found".format(pattern.pattern))
+
+    checks.extend(failed)
+
+    if tcalc.expired:
+      raise Exception("Not available via all IP addresses after {:0.0f} seconds".
+                      format(tcalc.elapsed))
+
+    delay.sleep(tcalc.remaining)
 
 
 class ExpectedPatternContext(retry.UrlWaitContext):
@@ -61,7 +153,7 @@ def Check(client, args, timeout):
 
   logging.info("Waiting for %s to match pattern %r", url, args.pattern)
 
-  return retry.wait_for_url(url, timeout.remaining, ctx=ctx)
+  return (url, retry.wait_for_url(url, timeout.remaining, ctx=ctx))
 
 
 def get_names(client, kind):
@@ -139,7 +231,9 @@ def main():
     cl.namespace = project_name
 
     try:
-      duration = Check(cl, args, timeout)
+      (url, duration) = Check(cl, args, timeout)
+
+      check_url_anyip(url, args.pattern, timeout.remaining)
     finally:
       collect_logs(cl)
 

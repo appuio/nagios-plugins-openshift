@@ -11,5 +11,6 @@ STATE_TEXT = {
     }
 
 DEFAULT_OC_BINARY = "/usr/bin/oc"
+DEFAULT_CURL_BINARY = "/usr/bin/curl"
 
 # vim: set sw=2 sts=2 et :

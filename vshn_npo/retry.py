@@ -95,7 +95,7 @@ def wait_for_url(url, timeout, ctx=None, min_delay=5, max_delay=30):
   logging.debug("Waiting up to %0.1f seconds for \"%s\" to become available",
       timeout, url)
 
-  delay = max(timeout * 0.01, min_delay)
+  delay = utils.Delayer(max(timeout * 0.01, min_delay), max_delay)
 
   ctx.timeout = utils.Timeout(timeout)
 
@@ -118,12 +118,6 @@ def wait_for_url(url, timeout, ctx=None, min_delay=5, max_delay=30):
     if ctx.timeout.expired:
       raise Exception("Not ready after {:0.0f} seconds".format(ctx.timeout.elapsed))
 
-    delay = min(delay * 1.25, ctx.timeout.remaining, max_delay)
-
-    # Add a small amount of jitter
-    delay *= 0.9 + (0.2 * random.random())
-
-    logging.debug("Sleeping %0.1f seconds", delay)
-    time.sleep(delay)
+    delay.sleep(ctx.timeout.remaining)
 
 # vim: set sw=2 sts=2 et :
