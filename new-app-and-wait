@@ -206,6 +206,8 @@ def main():
   parser.add_argument("-c", "--critical", type=int, metavar="SEC", default=15 * 60,
                       help=("Fail if application takes more given number of"
                             " seconds to become available"))
+  parser.add_argument("--project-prefix", type=str, default="e2e",
+                      help="Prefix for project name")
   parser.add_argument("--path", type=str, default="/",
                       help="Resource to request from application")
   parser.add_argument("--pattern", type=re.compile, default="<body>",
@@ -237,7 +239,7 @@ def main():
 
     cl.run(["whoami"])
 
-    namer = oc_client.ProjectNamer("bd")
+    namer = oc_client.ProjectNamer(args.project_prefix)
 
     # Get rid of old projects
     oc_client.cleanup_projects(cl, namer, 2 * args.critical, 24 * 3600)

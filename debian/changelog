@@ -1,3 +1,9 @@
+nagios-plugins-openshift (0.11.4) trusty; urgency=medium
+
+  * Change default prefix for end-to-end test projects from "bd" to "e2e".
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Tue, 14 Mar 2017 14:12:48 +0100
+
 nagios-plugins-openshift (0.11.3) trusty; urgency=medium
 
   * Log output of "oc describe" in addition to "oc logs" for end-to-end
