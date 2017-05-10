@@ -46,6 +46,8 @@ def check_url_anyip(url, pattern, timeout):
   :param pattern: Compiled regular expression
 
   """
+  logging.info("Checking access to \"%s\" via all load balancers", url)
+
   tcalc = utils.Timeout(timeout)
 
   parsed_url = urllib3.util.parse_url(url)
@@ -60,6 +62,7 @@ def check_url_anyip(url, pattern, timeout):
 
   checks = []
 
+  logging.info("Resolving host \"%s\"", parsed_url.host)
   addrinfo = socket.getaddrinfo(parsed_url.host, port, type=socket.SOCK_STREAM)
 
   for (af, socktype, proto, _, sa) in addrinfo:
@@ -122,6 +125,8 @@ class ExpectedPatternContext(retry.UrlWaitContext):
     if not self._pattern.search(resp.text):
       raise Exception("Expected pattern \"{}\" not found".format(self._pattern.pattern))
 
+    logging.info("Pattern found in response")
+
 
 def Check(client, args, timeout):
   appname = "testapp"
@@ -135,6 +140,7 @@ def Check(client, args, timeout):
   if args.strategy is not None:
     create_cmd.append("--strategy={}".format(args.strategy))
 
+  logging.info("Creating application from %s", args.source)
   client.run(create_cmd)
 
   client.run(["expose", "svc", appname])
@@ -167,7 +173,7 @@ def collect_logs_inner(client, kind, has_logs):
     client.run(["describe", "--show-events", name], ignore_errors=True)
 
     if has_logs:
-      logging.info("Logs for %r", name)
+      logging.debug("Logs for %r", name)
       client.run(["logs", "--timestamps", name], ignore_errors=True)
 
 
@@ -257,6 +263,7 @@ def main():
     finally:
       collect_logs(cl)
 
+    logging.info("Deleting project \"%s\"", project_name)
     oc_client.delete_project(cl, project_name, ignore_errors=True)
 
     if duration >= args.warning:

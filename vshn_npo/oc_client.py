@@ -67,10 +67,13 @@ def TemporaryConfig(cfgfile):
   with tempfile.TemporaryDirectory(prefix="os-e2e-") as tmpdir:
     path = tempfile.mktemp(dir=tmpdir, prefix="cfg", suffix="")
 
+    with open(cfgfile, "r") as fh:
+      content = fh.read()
+
+    logging.debug("Configuration:\n%s", content)
+
     with open(path, "w") as fh:
-      content = open(cfgfile, "r").read()
       fh.write(content)
-      logging.info("Configuration:\n%s", content)
 
     yield path
 
