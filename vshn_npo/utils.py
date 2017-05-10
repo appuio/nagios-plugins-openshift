@@ -116,26 +116,36 @@ def NagiosOutputFile(nagios_output):
     fh = open(nagios_output, "w")
 
   ctx = _Reporter()
+  logbuf = io.StringIO()
+  rootlogger = logging.getLogger(name=None)
 
   try:
-    try:
-      yield ctx.exit
-    except Exception as err:
-      logging.exception("Exception caught")
-      ctx.exit(constants.STATE_CRITICAL, str(err))
+    handler = logging.StreamHandler(stream=logbuf)
+    handler.setLevel(logging.INFO)
+    handler.setFormatter(logging.Formatter(fmt="%(asctime)s %(message)s"))
+
+    with contextlib.ExitStack() as exstack:
+      # Add custom handler while check runs
+      rootlogger.addHandler(handler)
+      exstack.callback(rootlogger.removeHandler, handler)
+      try:
+        yield ctx.exit
+      except Exception as err:
+        logging.exception("Exception caught")
+        ctx.exit(constants.STATE_CRITICAL, str(err))
   finally:
-    buf = io.StringIO()
-    buf.write(ctx.exit_code_text)
-    buf.write(" ")
-    buf.write(", ".join(str(i) for i in _iter_any(ctx.output)))
+    fh.write(ctx.exit_code_text)
+    fh.write(" ")
+    fh.write(", ".join(str(i) for i in _iter_any(ctx.output)))
     if ctx.metrics:
-      buf.write(" | ")
-      buf.write(" ".join(str(i) for i in _iter_any(ctx.metrics)))
-
-    logging.info("%s", buf.getvalue())
-
-    fh.write(buf.getvalue())
+      fh.write(" | ")
+      fh.write(" ".join(str(i) for i in _iter_any(ctx.metrics)))
     fh.write("\n")
+
+    handler.flush()
+
+    fh.write("\nLog messages:\n")
+    fh.write(logbuf.getvalue())
     fh.flush()
 
 
