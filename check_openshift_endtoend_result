@@ -40,8 +40,9 @@ exitcode="$state_critical"
 
 while read line; do
   if [[ -z "$line" ]]; then
-    # Pass remainder of input file through
-    cat
+    # Pass remainder of input file through while replacing characters used by
+    # Icinga to detect HTML output
+    sed -e 's|<|#lt#|g' -e 's|>|#gt#|g'
     break
   elif [[ "$line" =~ ^X-Status:[[:space:]]([0-9]+)$ ]]; then
     exitcode=${BASH_REMATCH[1]}
