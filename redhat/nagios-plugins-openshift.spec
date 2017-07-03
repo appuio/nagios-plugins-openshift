@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.10.0
+Version: 0.11.7
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -8,6 +8,7 @@ URL: https://git.vshn.net/vshn/nagios-plugins-openshift
 Vendor: VSHN AG
 Packager: Michael Hanselmann <hansmi@vshn.ch>
 BuildRequires: python34-devel
+Requires: python34-dateutil
 
 %package config
 Requires: icinga2, sudo
@@ -41,5 +42,9 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Mon Jul 3 2017 Michael Hanselmann <hansmi@vshn.ch> 0.11.7-1
+* Add "check_openshift_cert_expiry_report" to evaluate result of
+  openshift-ansible certificate report.
+
 * Tue Jan 3 2017 Michael Hanselmann <hansmi@vshn.ch> 0.10.0-1
 - Initial release for RedHat (only the Icinga configuration works)

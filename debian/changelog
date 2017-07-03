@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.11.7) trusty; urgency=medium
+
+  * Add "check_openshift_cert_expiry_report" to evaluate result of
+    openshift-ansible certificate report.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Mon, 03 Jul 2017 15:38:20 +0200
+
 nagios-plugins-openshift (0.11.6) trusty; urgency=medium
 
   * Record log messages at level INFO and above during end-to-end test and

@@ -1,0 +1,124 @@
+#!/usr/bin/python3
+
+import argparse
+import datetime
+import dateutil.parser
+import html
+import io
+import json
+import operator
+import sys
+
+from vshn_npo import constants
+from vshn_npo import utils
+
+
+def health_to_icinga(text):
+  if text == "ok":
+    return "[OK]"
+
+  if text == "warning":
+    return "[WARNING]"
+
+  return "[CRITICAL]"
+
+
+def main():
+  parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+  utils.add_verbose_argument(parser)
+  parser.add_argument("report", type=argparse.FileType('r'),
+                      help="Path to certificate expiry report in JSON format")
+  args = parser.parse_args()
+
+  utils.setup_basic_logging(args.verbose)
+
+  now = datetime.datetime.now()
+  report = json.load(args.report)
+  summary = report["summary"]
+
+  last_check = None
+
+  total_count = int(summary["total"])
+  expired_count = int(summary["expired"])
+  warning_count = int(summary["warning"])
+  ok_count = int(summary["ok"])
+
+  exit_status = constants.STATE_OK
+
+  if expired_count == 0:
+    if warning_count == 0:
+      exit_status = constants.STATE_OK
+    else:
+      exit_status = constants.STATE_WARNING
+  else:
+    exit_status = constants.STATE_CRITICAL
+
+  output = [
+      ("{} certificates, {} expired, {} warning(s), {} OK".
+       format(total_count, expired_count, warning_count, ok_count))
+      ]
+
+  table = io.StringIO()
+  table.write("<table>")
+
+  for (machine_name, machine_data) in sorted(report["data"].items()):
+    table.write("<tr><td colspan=\"3\">")
+    table.write(html.escape(machine_name))
+    table.write("</td></tr>")
+
+    for (component, certs) in sorted(machine_data.items()):
+      if component == "meta":
+        checked_at = dateutil.parser.parse(certs["checked_at_time"])
+
+        if last_check is None:
+          last_check = checked_at
+        else:
+          last_check = max(last_check, checked_at)
+
+        continue
+
+      for (idx, i) in enumerate(sorted(certs, key=operator.itemgetter("path"))):
+        table.write("<tr><td><code>")
+        table.write(html.escape(i["path"]))
+        table.write("</td><td>")
+        table.write(html.escape(i["expiry"]))
+        table.write("</td><td>")
+        table.write(html.escape(health_to_icinga(i["health"].lower())))
+        table.write("</td></tr>")
+
+    table.write("<tr><td>---------</td></tr>")
+
+  table.write("</table>")
+
+  output.append("report generated at about {}".format(last_check))
+
+  if last_check is None:
+    output.append("[CRITICAL] Missing timestamp of last report update")
+    exit_status = constants.STATE_CRITICAL
+  else:
+    report_age_hours = (now - last_check).seconds / 3600.0
+
+    if report_age_hours > 50:
+      report_age_status = constants.STATE_CRITICAL
+      report_age_prefix = "[CRITICAL] "
+    elif report_age_hours > 30:
+      report_age_status = constants.STATE_WARNING
+      report_age_prefix = "[WARNING] "
+    else:
+      report_age_status = constants.STATE_OK
+      report_age_prefix = ""
+
+    if report_age_status != constants.STATE_OK:
+      exit_status = max(exit_status, report_age_status)
+      output.append("{}report not updated {} or more hours".
+          format(report_age_prefix, report_age_hours))
+
+  print("; ".join(output))
+  print(table.getvalue())
+  sys.exit(exit_status)
+
+
+if __name__ == "__main__":
+  main()
+
+# vim: set sw=2 sts=2 et :
