@@ -1,3 +1,9 @@
+nagios-plugins-openshift (0.11.8) trusty; urgency=medium
+
+  * List remaining days in output of "check_openshift_cert_expiry_report".
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Tue, 04 Jul 2017 15:58:22 +0200
+
 nagios-plugins-openshift (0.11.7) trusty; urgency=medium
 
   * Add "check_openshift_cert_expiry_report" to evaluate result of

@@ -59,10 +59,15 @@ def main():
       ]
 
   table = io.StringIO()
-  table.write("<table>")
+  table.write("<table><tr>")
+  table.write("<td>Path</td>")
+  table.write("<td>Days</td>")
+  table.write("<td>Expiry</td>")
+  table.write("<td>Health</td>")
+  table.write("</tr>")
 
   for (machine_name, machine_data) in sorted(report["data"].items()):
-    table.write("<tr><td colspan=\"3\">")
+    table.write("<tr><td colspan=\"4\">")
     table.write(html.escape(machine_name))
     table.write("</td></tr>")
 
@@ -80,6 +85,8 @@ def main():
       for (idx, i) in enumerate(sorted(certs, key=operator.itemgetter("path"))):
         table.write("<tr><td><code>")
         table.write(html.escape(i["path"]))
+        table.write("</td><td align=\"right\">")
+        table.write(html.escape(str(i["days_remaining"])))
         table.write("</td><td>")
         table.write(html.escape(i["expiry"]))
         table.write("</td><td>")
