@@ -2,10 +2,8 @@ Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: nagios-plugins-docker
 
 Files: *
-Copyright: 2016, VSHN AG, info@vshn.ch
+Copyright: 2016-2017, VSHN AG, info@vshn.ch
 License: BSD-3-clause
-  All rights reserved.
-  .
   Redistribution and use in source and binary forms, with or without
   modification, are permitted provided that the following conditions are met:
   .
