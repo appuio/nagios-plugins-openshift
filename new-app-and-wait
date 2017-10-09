@@ -22,6 +22,7 @@ def capture_curl(url, options=None, curl_binary=constants.DEFAULT_CURL_BINARY):
     "--verbose",
     "--silent",
     "--show-error",
+    "--fail",
     "--retry", "3",
     "--max-time", "300",
     ]
