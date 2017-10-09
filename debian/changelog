@@ -1,4 +1,4 @@
-nagios-plugins-openshift (0.11.9) UNRELEASED; urgency=medium
+nagios-plugins-openshift (0.11.9) trusty; urgency=medium
 
   * new-app-and-wait: Add missing "--fail" argument to cURL command.
   * check_openshift_es_stats: Remove workaround for Elasticsearch not
