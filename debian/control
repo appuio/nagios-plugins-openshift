@@ -8,7 +8,7 @@ Build-Depends: debhelper (>= 8.0.0),
  dh-python
 Standards-Version: 3.9.5
 X-Python3-Version: >= 3.4
-Homepage: https://git.vshn.net/vshn/nagios-plugins-openshift
+Homepage: https://github.com/appuio/nagios-plugins-openshift
 
 Package: nagios-plugins-openshift
 Architecture: all
