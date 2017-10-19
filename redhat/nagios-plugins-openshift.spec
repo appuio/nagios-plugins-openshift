@@ -1,10 +1,10 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.11.8
+Version: 0.11.9
 Release: 1
 License: BSD-3-Clause
 Source: .
-URL: https://git.vshn.net/vshn/nagios-plugins-openshift
+URL: https://github.com/appuio/nagios-plugins-openshift
 Vendor: VSHN AG
 Packager: Michael Hanselmann <hansmi@vshn.ch>
 BuildRequires: python34-devel
