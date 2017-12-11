@@ -17,12 +17,6 @@ usage() {
   echo '      given are available'
   echo ' -l   Select using label and value.'
   echo ' -s   Select using volume capacity.'
-  echo ' -W   Exit with WARNING status if the number of failed volumes is larger'
-  echo '      than or equal to the given number. This is a global limit and not'
-  echo '      part of the label-specific limits.'
-  echo ' -C   Exit with CRITICAL status if the number of failed volumes is larger'
-  echo '      than or equal to the given number. This is a global limit and not'
-  echo '      part of the label-specific limits.'
   echo
   echo 'Volumes selected using the "-l" or "-s" options are not considered for the'
   echo 'generic or later selection-specific limits. The first selector matching a'
