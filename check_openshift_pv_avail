@@ -166,7 +166,10 @@ filter_volumes() {
     uidfilter+=".metadata.uid != \"$uid\""
   done
 
-  jqfilter='[.items[]'
+  jqfilter='[
+    .items[] |
+    select((.metadata.annotations["pv.kubernetes.io/provisioned-by"] // null) | not)
+  '
   if [[ -n "$uidfilter" ]]; then
     jqfilter+=" | select($uidfilter)"
   fi
