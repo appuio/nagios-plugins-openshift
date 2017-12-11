@@ -24,7 +24,7 @@ usage() {
   echo '      than or equal to the given number. This is a global limit and not'
   echo '      part of the label-specific limits.'
   echo
-  echo 'Volume selected using the "-l" or "-s" options are not considered for the'
+  echo 'Volumes selected using the "-l" or "-s" options are not considered for the'
   echo 'generic or later selection-specific limits. The first selector matching a'
   echo 'volume applies.'
   echo
