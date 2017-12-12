@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.11.10) trusty; urgency=medium
+
+  * check_openshift_pv_avail: Fix typos and remove information no longer
+    applicable from usage description; ignore dynamically-provisioned PVs
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Tue, 12 Dec 2017 10:57:50 +0100
+
 nagios-plugins-openshift (0.11.9) trusty; urgency=medium
 
   * new-app-and-wait: Add missing "--fail" argument to cURL command.
