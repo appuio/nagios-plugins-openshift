@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.11.11) trusty; urgency=medium
+
+  * check_openshift_pod_count: Handle pods without conditions in status
+    object.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Wed, 07 Feb 2018 17:32:17 +0100
+
 nagios-plugins-openshift (0.11.10) trusty; urgency=medium
 
   * check_openshift_pv_avail: Fix typos and remove information no longer
