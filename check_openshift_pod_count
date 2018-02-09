@@ -92,7 +92,7 @@ count_ready() {
   # https://godoc.org/k8s.io/kubernetes/pkg/api/v1>
   jq -r \
     '[.items[].status |
-      select(.conditions[] | select(.type == "Ready") | .status == "True")
+      select((.conditions // [])[] | select(.type == "Ready") | .status == "True")
      ] | length'
 }
 
