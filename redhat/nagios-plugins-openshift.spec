@@ -8,6 +8,16 @@ URL: https://github.com/appuio/nagios-plugins-openshift
 Vendor: VSHN AG
 Packager: Michael Hanselmann <hansmi@vshn.ch>
 BuildRequires: python34-devel
+Requires: bash
+Requires: curl >= 7.21.3
+# TODO: daemontools for end-to-end tests (systemd unit?)
+Requires: nagios-plugins-dns
+Requires: openshift-origin-client-tools >= 3.6
+Requires: jq >= 1.5
+Requires: python34
+Requires: python3-nagiosplugin >= 1.2
+Requires: python34-requests >= 2.12
+Requires: python34-urllib3 >= 1.13
 Requires: python34-dateutil
 
 %package config
@@ -26,6 +36,8 @@ Icinga2 check command definitions for nagios-plugins-openshift
 cp -v -R -a %SOURCE0/* .
 
 %build
+sed -i -re 's#^(DEFAULT_OC_BINARY[[:blank:]]*=[[:blank:]]*).*$#\1"%{_libdir}/openshift-origin-client-tools/oc"#' \
+  vshn_npo/constants.py
 %py3_build
 make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 
@@ -51,3 +63,5 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 
 * Tue Jan 3 2017 Michael Hanselmann <hansmi@vshn.ch> 0.10.0-1
 - Initial release for RedHat (only the Icinga configuration works)
+
+# vim: set sw=2 sts=2 et :
