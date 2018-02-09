@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.11.9
+Version: 0.12.0
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -54,6 +54,9 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Fri Feb 9 2018 Michael Hanselmann <hansmi@vshn.ch> 0.12.0-1
+- Initial version with most checks working on CentOS and RHEL.
+
 * Tue Jul 4 2017 Michael Hanselmann <hansmi@vshn.ch> 0.11.4-1
 - List remaining days in output of "check_openshift_cert_expiry_report".
 
