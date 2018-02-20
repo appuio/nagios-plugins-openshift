@@ -86,7 +86,7 @@ filter_pods() {
   jq -r "
     .items[] |
     select(.spec.nodeName == \"${node//\"}\") |
-    select(.status.conditions[] | select(.type == \"Ready\") | .status == \"True\") |
+    select((.status.conditions // [])[] | select(.type == \"Ready\") | .status == \"True\") |
     .metadata.name
   "
 }

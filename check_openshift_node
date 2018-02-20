@@ -60,7 +60,7 @@ output=()
 get_condition() {
   local name="$1"
 
-  jq -r ".status.conditions[] | select(.type == \"$name\") | [.status, .message] | @sh"
+  jq -r "(.status.conditions // [])[] | select(.type == \"$name\") | [.status, .message] | @sh"
 }
 
 check_condition() {
