@@ -66,7 +66,7 @@ fi
 
 jq -r '
   .items |
-  map(select(.status.conditions[] | select(.type == "Ready") | .status == "True")) |
+  map(select((.status.conditions // [])[] | select(.type == "Ready") | .status == "True")) |
   group_by(.spec.nodeName) |
   map([.[0].spec.nodeName, .[].metadata.name]) |
   .[] |
