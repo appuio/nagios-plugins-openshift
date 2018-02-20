@@ -84,6 +84,7 @@ context_nickname="ctx-$cluster_nickname-$user_nickname"
 /usr/bin/oc --config="$tmpfile" config set-cluster \
   "$cluster_nickname" \
   --server="$opt_server" \
+  --api-version= \
   --insecure-skip-tls-verify=false
 
 /usr/bin/oc --config="$tmpfile" config set-context \
