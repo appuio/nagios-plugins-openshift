@@ -1,3 +1,13 @@
+nagios-plugins-openshift (0.11.12) trusty; urgency=medium
+
+  * check_openshift_node, check_openshift_node_fluentd,
+    check_openshift_pod_node_alloc: Handle pods without conditions in status
+    object.
+  * write-config: Remove "--api-version" parameter from call to "oc config
+    set-cluster" and bump required version of OpenShift client accordingly.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Tue, 20 Feb 2018 16:38:35 +0100
+
 nagios-plugins-openshift (0.11.11) trusty; urgency=medium
 
   * check_openshift_pod_count: Handle pods without conditions in status
