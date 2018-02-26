@@ -2,6 +2,8 @@
 
 set -e -u -o pipefail
 
+. /usr/lib/nagios-plugins-openshift/utils
+
 usage() {
   echo "Usage: $0 -f <path> -s <server>:<port> -t <token>"
   echo
@@ -75,24 +77,24 @@ user_nickname=cred-$(make_nickname "$opt_server")
 cluster_nickname=cluster-$(make_nickname "$opt_server")
 context_nickname="ctx-$cluster_nickname-$user_nickname"
 
-/usr/bin/oc --config="$tmpfile" config set-credentials \
+run_oc "$tmpfile" config set-credentials \
   "$user_nickname" \
   --token="$opt_token" \
   --username= \
   --password=
 
-/usr/bin/oc --config="$tmpfile" config set-cluster \
+run_oc "$tmpfile" config set-cluster \
   "$cluster_nickname" \
   --server="$opt_server" \
   --insecure-skip-tls-verify=false
 
-/usr/bin/oc --config="$tmpfile" config set-context \
+run_oc "$tmpfile" config set-context \
   "$context_nickname" \
   --cluster="$cluster_nickname" \
   --user="$user_nickname" \
   --namespace=
 
-/usr/bin/oc --config="$tmpfile" config use-context \
+run_oc "$tmpfile" config use-context \
   "$context_nickname"
 
 if [[ -n "$opt_check" ]]; then

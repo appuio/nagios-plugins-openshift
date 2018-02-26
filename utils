@@ -5,6 +5,8 @@ readonly state_warning=1
 readonly state_critical=2
 readonly state_unknown=3
 
+readonly OPENSHIFT_CLIENT_BINARY=/usr/bin/oc
+
 #
 # Print arguments joined by delimiter
 #
@@ -128,7 +130,7 @@ run_oc() {
 
   # See https://github.com/openshift/origin/issues/9581
   HOME=/ \
-  /usr/bin/oc \
+  "$OPENSHIFT_CLIENT_BINARY" \
     --config="$cfgfile" \
     --namespace=default \
     "$@"
