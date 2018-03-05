@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.12.0
+Version: 0.12.1
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -54,6 +54,10 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Mon Mar 5 2018 Michael Hanselmann <hansmi@vshn.ch> 0.12.1-1
+- check_openshift_node_fluentd: Check all nodes, not only those marked
+  schedulable
+
 * Fri Feb 9 2018 Michael Hanselmann <hansmi@vshn.ch> 0.12.0-1
 - Initial version with most checks working on CentOS and RHEL.
 

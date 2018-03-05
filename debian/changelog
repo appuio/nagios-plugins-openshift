@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.12.1) trusty; urgency=medium
+
+  * check_openshift_node_fluentd: Check all nodes, not only those marked
+    schedulable
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Mon, 05 Mar 2018 17:47:12 +0100
+
 nagios-plugins-openshift (0.11.12) trusty; urgency=medium
 
   * check_openshift_node, check_openshift_node_fluentd,
