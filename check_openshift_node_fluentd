@@ -75,10 +75,8 @@ fi
 
 # Data structure documentation:
 # https://godoc.org/k8s.io/kubernetes/pkg/api/v1>
-jq -r '
-  .items[] | select(.spec.unschedulable != true) | .metadata.name |
-  @text
-' < "$tmpdir/node.json" > "$tmpdir/node.txt"
+jq -r '.items[].metadata.name | @text' \
+  < "$tmpdir/node.json" > "$tmpdir/node.txt"
 
 filter_pods() {
   local node="$1"
