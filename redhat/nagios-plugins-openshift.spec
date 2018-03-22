@@ -12,7 +12,7 @@ Requires: bash
 Requires: curl >= 7.21.3
 # TODO: daemontools for end-to-end tests (systemd unit?)
 Requires: nagios-plugins-dns
-Requires: openshift-origin-client-tools >= 3.6
+Requires: openshift-origin-client-tools >= 3.7.2
 Requires: jq >= 1.5
 Requires: python34
 Requires: python3-nagiosplugin >= 1.2
