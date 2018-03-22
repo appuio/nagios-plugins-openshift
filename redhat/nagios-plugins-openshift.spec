@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.12.1
+Version: 0.12.2
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -54,6 +54,11 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Thu Mar 22 2018 Michael Hanselmann <hansmi@vshn.ch> 0.12.2-1
+- Install "new-app-and-wait" script.
+- Update openshift-origin-client-tools dependency to require version 3.7.2 or
+  newer.
+
 * Mon Mar 5 2018 Michael Hanselmann <hansmi@vshn.ch> 0.12.1-1
 - check_openshift_node_fluentd: Check all nodes, not only those marked
   schedulable
