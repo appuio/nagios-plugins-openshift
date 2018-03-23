@@ -16,7 +16,7 @@ Depends: ${misc:Depends}, ${python3:Depends}, bash,
  curl (>= 7.21.3),
  daemontools,
  nagios-plugins-basic,
- openshift-origin-client-tools (>= 3.6),
+ openshift-origin-client-tools (>= 3.7.2),
 # jq 1.4 fixes https://github.com/stedolan/jq/issues/208
  jq (>= 1.4),
  python3 (>= 3.4),

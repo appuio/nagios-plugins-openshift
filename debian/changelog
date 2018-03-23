@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.12.2) trusty; urgency=medium
+
+  * Update openshift-origin-client-tools dependency to require version 3.7.2
+    or newer.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Thu, 22 Mar 2018 17:26:57 +0100
+
 nagios-plugins-openshift (0.12.1) trusty; urgency=medium
 
   * check_openshift_node_fluentd: Check all nodes, not only those marked
