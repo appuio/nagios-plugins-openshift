@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.12.3) trusty; urgency=medium
+
+  * check_openshift_pvc_phase: Show requested size, volume name and bound
+    capacity for pending and lost claims.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Tue, 03 Apr 2018 14:58:57 +0200
+
 nagios-plugins-openshift (0.12.2) trusty; urgency=medium
 
   * Update openshift-origin-client-tools dependency to require version 3.7.2
