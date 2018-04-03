@@ -48,7 +48,13 @@ if ! msg=$(run_oc "$opt_cfgfile" get pvc \
 fi
 
 jq -r '.items[] |
-  @sh "name=\(.metadata.namespace + "/" + .metadata.name) phase=\(.status.phase)"
+  @sh " \\
+    name=\(.metadata.namespace + "/" + .metadata.name) \\
+    phase=\(.status.phase) \\
+    volname=\(.spec.volumeName // "") \\
+    reqstorage=\(.spec.resources.requests.storage // "") \\
+    capacity=\(.status.capacity.storage // "") \\
+  "
   ' \
   < "$tmpdir/data.json" > "$tmpdir/parsed.sh"
 
@@ -71,16 +77,36 @@ while read line; do
 
   let "++phase_count[$lc_phase]"
 
+  info=()
+
+  if [[ -n "$reqstorage" ]]; then
+    info+=( "req size: ${reqstorage}" )
+  fi
+
+  if [[ -n "$capacity" ]]; then
+    info+=( "capacity: ${capacity}" )
+  fi
+
+  if [[ -n "$volname" ]]; then
+    info+=( "PV name: ${volname}" )
+  fi
+
+  if [[ -n "${info[*]+${info[*]}}" ]]; then
+    infostr="${name} ($(join_args ', ' "${info[@]}"))"
+  else
+    infostr="$name"
+  fi
+
   # https://github.com/kubernetes/kubernetes/blob/v1.3.4/pkg/api/v1/types.go#L514
   case "$lc_phase" in
     bound) ;;
 
     pending)
-      pending_claims+=( "$name" )
+      pending_claims+=( "$infostr" )
       ;;
 
     lost)
-      lost_claims+=( "$name" )
+      lost_claims+=( "$infostr" )
       ;;
 
     *)
