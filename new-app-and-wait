@@ -7,6 +7,7 @@ import logging
 import re
 import socket
 import subprocess
+import tempfile
 import time
 import urllib3
 
@@ -132,17 +133,20 @@ class ExpectedPatternContext(retry.UrlWaitContext):
 def Check(client, args, timeout):
   appname = "testapp"
 
-  create_cmd = [
-    "new-app",
-    "--name={}".format(appname),
-    args.source,
-    ]
+  with tempfile.TemporaryDirectory() as tmpdir:
+    create_cmd = [
+      "new-app",
+      "--name={}".format(appname),
+      args.source,
+      ]
 
-  if args.strategy is not None:
-    create_cmd.append("--strategy={}".format(args.strategy))
+    if args.strategy is not None:
+      create_cmd.append("--strategy={}".format(args.strategy))
 
-  logging.info("Creating application from %s", args.source)
-  client.run(create_cmd)
+    logging.info("Creating application from %s", args.source)
+    client.run(create_cmd, env_override={
+      "TMPDIR": tmpdir,
+      })
 
   client.run(["expose", "svc", appname])
 
