@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.12.3
+Version: 0.12.4
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -54,7 +54,12 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
-* Mon Apr 3 2018 Michael Hanselmann <hansmi@vshn.ch> 0.12.3-1
+* Wed Apr 4 2018 Michael Hanselmann <hansmi@vshn.ch> 0.12.4-1
+- new-app-and-wait: The upstream code for "oc new-app" can leave a clone of the
+  application source behind in a temporary directory. Explicitly specify
+  a temporary directory which is then removed by the wrapper code.
+
+* Tue Apr 3 2018 Michael Hanselmann <hansmi@vshn.ch> 0.12.3-1
 - check_openshift_pvc_phase: Show requested size, volume name and bound
   capacity for pending and lost claims.
 

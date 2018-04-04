@@ -1,3 +1,4 @@
+import os
 import base64
 import contextlib
 import functools
@@ -110,7 +111,7 @@ class Client:
 
     return result
 
-  def run(self, args, ignore_errors=False):
+  def run(self, args, ignore_errors=False, env_override=None):
     """Run OpenShift client.
 
     :param args: Arguments to pass to OpenShift client.
@@ -121,12 +122,18 @@ class Client:
     cmd.extend(args)
     logging.debug("%r", cmd)
 
+    if env_override:
+      env = os.environ.copy()
+      env.update(env_override)
+    else:
+      env = None
+
     if ignore_errors:
       fn = subprocess.call
     else:
       fn = subprocess.check_call
 
-    fn(cmd)
+    fn(cmd, env=env)
 
   def capture_output(self, args):
     cmd = self._make_base_cmd()
