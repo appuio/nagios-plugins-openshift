@@ -1,0 +1,256 @@
+#!/bin/bash
+
+set -e -u -o pipefail
+
+. /usr/lib/nagios-plugins-openshift/utils
+
+default_namespace=default
+
+usage() {
+  echo "Usage: $0 -f <path> [-w <name>=<number>] [-c <name>=<number>]"
+  echo
+  echo 'Check the number of pods and their phases in all namespaces/projects.'
+  echo
+  echo 'Options:'
+  echo ' -f             Config file path'
+  echo ' -w name=value  Warn if given performance metric is more than given'\
+    'value'
+  echo ' -c name=value  Fail if given performance metric is more than given'\
+    'value'
+  echo
+  echo 'Metric names for limits with phase in lowercase:'
+  echo ' - global.<phase>'
+  echo ' - all.project.<phase>'
+  echo ' - project.<namespace>.<phase>'
+}
+
+tmpdir=$(mktemp -d)
+trap 'rm -rf "$tmpdir"' EXIT
+
+limitfile="${tmpdir}/limits.json"
+podfile="${tmpdir}/pods.json"
+metricsfile="${tmpdir}/metrics.sh"
+
+echo '{}' > "$limitfile"
+
+add_limit() {
+  local key="$1" arg="$2"
+  local name value
+
+  IFS== read -r name value <<<"$arg"
+
+  if [[ -z "$name" || -z "$value" ]]; then
+    usage >&2
+    exit "$state_critical"
+  fi
+
+  jq --raw-output --arg name "$name" --arg key "$key" --arg value "$value" '
+    .[$name][$key] = ($value | tonumber)
+  ' <"$limitfile" >"${limitfile}.tmp" && \
+  mv "${limitfile}.tmp" "$limitfile"
+}
+
+opt_cfgfile=
+
+while getopts 'hf:w:c:' opt; do
+  case "$opt" in
+    h)
+      usage
+      exit 0
+      ;;
+    f) opt_cfgfile="$OPTARG" ;;
+    w)
+      add_limit warn "$OPTARG"
+      ;;
+    c)
+      add_limit crit "$OPTARG"
+      ;;
+    *)
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+shift $((OPTIND - 1))
+
+if [[ "$#" -gt 0 ]]; then
+  usage >&2
+  exit 1
+fi
+
+if [[ -z "$opt_cfgfile" ]]; then
+  usage >&2
+  exit 1
+fi
+
+oc_args=(
+  --all-namespaces
+  --output=json
+  )
+
+# Capture stderr in variable and redirect stdout to file
+# shellcheck disable=SC2069
+if ! msg=$(run_oc "$opt_cfgfile" get pod "${oc_args[@]}" 2>&1 >"$podfile"); then
+  echo "$msg"
+  exit "$state_critical"
+fi
+
+process_data() {
+  # Data structure documentation:
+  # https://godoc.org/k8s.io/api/core/v1#Pod
+  jq --raw-output \
+    --argfile limits "$1" \
+    --argjson state_ok "$state_ok" \
+    --argjson state_warning "$state_warning" \
+    --argjson state_critical "$state_critical" \
+    --argjson state_unknown "$state_unknown" '
+# Compute per-project counts
+.items | group_by(.metadata.namespace) | map(
+  .[0].metadata.namespace as $namespace |
+  {
+    count: length,
+  } + (
+    map(.status.phase = (.status.phase | ascii_downcase)) |
+    group_by(.status.phase) |
+    map({ key: (.[0].status.phase), value: length }) |
+    from_entries
+  ) | [$namespace, .]
+) as $projects |
+
+# Compute global sums for each phase
+(reduce $projects[] as $item ({};
+  . as $cur |
+  $cur + ($item[1] | with_entries(.value += (($cur[.key] // 0))))
+)) as $global |
+
+def find_limit($type_key; $name; $fallback_name):
+  $limits[$name][$type_key] // (
+    if $fallback_name == null then
+      null
+    else
+      $limits[$fallback_name][$type_key] // null
+    end
+  )
+;
+
+# Transform individual counts into performance data and add limits
+(
+  (
+    $global | to_entries | map(
+      "global.\(.key)" as $name |
+      {
+        name: $name,
+        value: .value,
+        crit: find_limit("crit"; $name; null),
+        warn: find_limit("warn"; $name; null)
+      }
+    )
+  ) + (
+    $projects | map(
+      .[0] as $namespace |
+      .[1] | to_entries[] | (
+        "project.\($namespace).\(.key)" as $name |
+        "all.project.\(.key)" as $fallback_name |
+        {
+          name: $name,
+          value: .value,
+          crit: find_limit("crit"; $name; $fallback_name),
+          warn: find_limit("warn"; $name; $fallback_name)
+        }
+      )
+    )
+  )
+) as $data |
+
+def state_prefix:
+  "[\(
+    if . == $state_ok then
+      "OK"
+    elif . == $state_warning then
+      "WARNING"
+    elif . == $state_critical then
+      "CRITICAL"
+    elif . == $state_unknown then
+      "UNKNOWN"
+    else
+      . | tostring
+    end
+  )]"
+;
+
+# Evaluate limits
+$data | map(
+  . as $cur |
+
+  (
+    $cur + {
+      status: $state_ok
+    }
+  ) | (
+    if .crit != null and .value > .crit then
+      . + {
+        status: $state_critical,
+        msg: "\(.name) of \(.value) larger than \(.crit)",
+      }
+    elif .warn != null and .value > .warn then
+      . + {
+        status: $state_warning,
+        msg: "\(.name) of \(.value) larger than \(.warn)",
+      }
+    else
+      .
+    end
+  )
+) | sort_by(
+  [(
+    if .status == $state_critical then
+      0
+    elif .status == $state_warning then
+      1
+    elif .status == $state_unknown then
+      2
+    else
+      3
+    end
+  ), .name]
+) as $perfdata |
+
+# Extract messages
+$perfdata | map(
+  select(.msg) | "\(.status | state_prefix) \(.msg)"
+) as $messages |
+
+# Values are sorted by severity, thus the first is also the worst
+$perfdata | first | (.status // $state_unknown) as $exit_status |
+
+# Format metrics
+$perfdata | (
+  sort_by(.name) |
+  map("\u0027\(.name)\u0027=\(.value);\(.warn // "");\(.crit // "");\(.min // 0)") |
+  join(" ")
+) as $fmtperfdata |
+
+@sh "
+  exit_status=\($exit_status)
+  output=\(
+    (
+      if ($messages | length) == 0 then
+        $exit_status | state_prefix
+      else
+        $messages | join(", ")
+      end
+    ) + " | " + $fmtperfdata
+  )
+"
+'
+}
+
+process_data "$limitfile" < "$podfile" > "$metricsfile"
+
+source "$metricsfile"
+
+echo "$output"
+exit "$exit_status"
+
+# vim: set sw=2 sts=2 et :
