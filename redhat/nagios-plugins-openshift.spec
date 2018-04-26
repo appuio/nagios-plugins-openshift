@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.12.4
+Version: 0.13.0
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -54,6 +54,10 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Thu Apr 26 2018 Michael Hanselmann <hansmi@vshn.ch> 0.13.0-1
+- Add "check_openshift_project_pod_phase" script to observe pod phase (pending,
+  running, etc.) of all pods on a cluster.
+
 * Wed Apr 4 2018 Michael Hanselmann <hansmi@vshn.ch> 0.12.4-1
 - new-app-and-wait: The upstream code for "oc new-app" can leave a clone of the
   application source behind in a temporary directory. Explicitly specify
