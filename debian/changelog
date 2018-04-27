@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.13.1) trusty; urgency=medium
+
+  * Expose count over all pod phases in "check_openshift_project_pod_phase" as
+    Icinga2 variable.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Fri, 27 Apr 2018 11:39:31 +0200
+
 nagios-plugins-openshift (0.13.0) trusty; urgency=medium
 
   * Add "check_openshift_project_pod_phase" script to observe pod phase
