@@ -148,25 +148,23 @@ filter_volumes() {
   local capacity="$1"; shift
   local label=
   local value=
-  local uidfilter=
-
-  # TODO: Switch to --argfile instead of trying to compose proper jq code
+  local exclude_uid=()
 
   for uid; do
-    if [[ -n "$uidfilter" ]]; then
-      uidfilter+=' and '
-    fi
-
-    uidfilter+=".metadata.uid != \"$uid\""
+    # TODO: Implement proper value escaping
+    exclude_uid+=( "\"$uid\"" )
   done
 
   jqfilter='[
     .items[] |
-    select((.metadata.annotations["pv.kubernetes.io/provisioned-by"] // null) | not)
+    . as $cur |
+    select(
+      (
+        ($cur.metadata.annotations["pv.kubernetes.io/provisioned-by"] // null) or
+        (($exclude_uid | index($cur.metadata.uid)) != null)
+      ) | not
+    )
   '
-  if [[ -n "$uidfilter" ]]; then
-    jqfilter+=" | select($uidfilter)"
-  fi
   if [[ -n "$labelval" ]]; then
     IFS='=' read label value <<< "$labelval"
     jqfilter+=" | select(.metadata.labels | .[\"$label\"] == \"$value\")"
@@ -177,7 +175,9 @@ filter_volumes() {
   fi
   jqfilter+=']'
 
-  jq -r "$jqfilter"
+  jq --raw-output \
+    --argjson exclude_uid "[$(join_args ', ' ${exclude_uid[@]+"${exclude_uid[@]}"})]" \
+    "$jqfilter"
 }
 
 #
