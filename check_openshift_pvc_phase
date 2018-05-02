@@ -4,22 +4,31 @@ set -e -u -o pipefail
 
 . /usr/lib/nagios-plugins-openshift/utils
 
+readonly default_maxpending=3600
+
 usage() {
   echo "Usage: $0 -f <path>"
   echo
   echo 'Options:'
   echo ' -f   Config file path'
+  echo ' -c   Maximum number of seconds a claim may remain pending before' \
+    "going critical (default: ${default_maxpending} seconds)"
 }
 
 opt_cfgfile=
+opt_maxpending="$default_maxpending"
 
-while getopts 'hf:' opt; do
+while getopts 'hf:c:' opt; do
   case "$opt" in
     h)
       usage
       exit 0
       ;;
     f) opt_cfgfile="$OPTARG" ;;
+    c)
+      validate_integer "$OPTARG"
+      opt_maxpending="$OPTARG"
+      ;;
     *)
       usage >&2
       exit 1
@@ -50,6 +59,7 @@ fi
 jq -r '.items[] |
   @sh " \\
     name=\(.metadata.namespace + "/" + .metadata.name) \\
+    creation=\(.metadata.creationTimestamp // "") \\
     phase=\(.status.phase) \\
     volname=\(.spec.volumeName // "") \\
     reqstorage=\(.spec.resources.requests.storage // "") \\
@@ -64,6 +74,8 @@ output=()
 metrics=()
 lost_claims=()
 pending_claims=()
+found_old=
+now=$(date +%s)
 
 declare -A phase_count=(
   [bound]=0
@@ -96,6 +108,10 @@ while read line; do
     info+=( "PV name: ${volname}" )
   fi
 
+  if [[ -n "$creation" ]]; then
+    info+=( "created ${creation}" )
+  fi
+
   if [[ -n "${info[*]+${info[*]}}" ]]; then
     infostr="${name} ($(join_args ', ' "${info[@]}"))"
   else
@@ -108,6 +124,12 @@ while read line; do
 
     pending)
       pending_claims+=( "$infostr" )
+
+      if [[ -n "$creation" && -z "$found_old" ]] && \
+         creation_ts=$(date -d "$creation" +%s) &&
+         (( (creation_ts + opt_maxpending) < now )); then
+        found_old=yes
+      fi
       ;;
 
     lost)
@@ -129,6 +151,10 @@ fi
 if [[ -n "${lost_claims[*]+${lost_claims[*]}}" ]]; then
   output+=( "lost: $(join_args ', ' "${lost_claims[@]}")" )
   exit_status=$(merge_status "$exit_status" "$state_critical")
+fi
+
+if [[ -n "$found_old" ]]; then
+  exit_status="$state_critical"
 fi
 
 if [[ -n "${!phase_count[*]}" ]]; then
