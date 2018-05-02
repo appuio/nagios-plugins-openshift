@@ -53,6 +53,7 @@ jq -r '.items[] |
     phase=\(.status.phase) \\
     volname=\(.spec.volumeName // "") \\
     reqstorage=\(.spec.resources.requests.storage // "") \\
+    storageclass=\(.spec.storageClassName // "") \\
     capacity=\(.status.capacity.storage // "") \\
   "
   ' \
@@ -81,6 +82,10 @@ while read line; do
 
   if [[ -n "$reqstorage" ]]; then
     info+=( "req size: ${reqstorage}" )
+  fi
+
+  if [[ -n "$storageclass" ]]; then
+    info+=( "class: ${storageclass}" )
   fi
 
   if [[ -n "$capacity" ]]; then
@@ -117,12 +122,12 @@ while read line; do
 done < "$tmpdir/parsed.sh"
 
 if [[ -n "${pending_claims[*]+${pending_claims[*]}}" ]]; then
-  output+=( "pending: ${pending_claims[*]}" )
+  output+=( "pending: $(join_args ', ' "${pending_claims[@]}")" )
   exit_status=$(merge_status "$exit_status" "$state_warning")
 fi
 
 if [[ -n "${lost_claims[*]+${lost_claims[*]}}" ]]; then
-  output+=( "lost: ${lost_claims[*]}" )
+  output+=( "lost: $(join_args ', ' "${lost_claims[@]}")" )
   exit_status=$(merge_status "$exit_status" "$state_critical")
 fi
 
