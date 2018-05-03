@@ -6,8 +6,8 @@ set -e -u -o pipefail
 
 usage() {
   echo "Usage: $0 -f <path> [-w <warn>] [-c <crit>]"
-  echo '          [-l <label>=<value> [-w <warn>] [-c <crit>] ...]'
-  echo '          [-s <capacity> [-w <warn>] [-c <crit>] ...]'
+  echo '          [-l [<class>,]<label>=<value> [-w <warn>] [-c <crit>] ...]'
+  echo '          [-s [<class>,]<capacity> [-w <warn>] [-c <crit>] ...]'
   echo
   echo 'Options:'
   echo ' -f   Config file path'
@@ -15,12 +15,17 @@ usage() {
   echo '      given are available'
   echo ' -c   Exit with CRITICAL status if fewer physical volumes than the number'
   echo '      given are available'
-  echo ' -l   Select using label and value.'
-  echo ' -s   Select using volume capacity.'
+  echo ' -l   Select using label, value and optional storage class.'
+  echo ' -s   Select using volume capacity and optional storage class.'
   echo
   echo 'Volumes selected using the "-l" or "-s" options are not considered for the'
   echo 'generic or later selection-specific limits. The first selector matching a'
   echo 'volume applies.'
+  echo
+  echo 'The "-l" and "-s" selectors support specifying a storage class name, i.e.'
+  echo '"-s bulk,5Gi". By default the limits following apply to all storage'
+  echo 'classes. Use the empty string (i.e. "-s ,1Gi") to select the default'
+  echo 'storage class'
   echo
   echo 'Examples:'
   echo " $0 -w 10"
@@ -39,6 +44,7 @@ usage() {
 }
 
 opt_cfgfile=
+opt_storageclass='*'
 opt_label=
 opt_capacity=
 opt_warn=
@@ -48,15 +54,61 @@ limits=()
 default_limits=
 
 push_limit() {
-  local labelval="$1"; shift
-  local capacity="$1"; shift
-  local joined=$(join_args ';' "$@")
+  local values="${opt_warn};${opt_crit}"
 
-  if [[ -z "$labelval" && -z "$capacity" ]]; then
-    default_limits="$joined"
+  if [[ -z "$opt_label" && -z "$opt_capacity" ]]; then
+    if [[ "$opt_storageclass" != '*' ]]; then
+      echo 'Storage class can not be given for default limits' >&2
+      exit 1
+    fi
+
+    default_limits="$values"
   else
-    limits+=( "$labelval;$capacity;$joined" )
+    limits+=( "${opt_storageclass};${opt_label};${opt_capacity};${values}" )
   fi
+}
+
+validate_key_value() {
+  if [[ "$1" != ?*=* ]]; then
+    echo "Label must be at least one character followed by an equal sign' \
+      'and a value: $1" >&2
+    exit "$state_critical"
+  fi
+}
+
+validate_capacity() {
+  local re='^[0-9]+(\.[0-9]+)?([MGTE]i?)?$'
+
+  if ! [[ "$1" =~ $re ]]; then
+    echo "Capacity must match regular expression \"${re}\": $1" >&2
+    exit "$state_critical"
+  fi
+}
+
+reset_limit() {
+  local varname="$1" value="$2" validatefn="$3"
+  local first second
+
+  opt_storageclass='*'
+  opt_label=
+  opt_capacity=
+  opt_warn=
+  opt_crit=
+
+  IFS=, read -r first second <<<"$value"
+
+  if [[ -n "$second" ]]; then
+    opt_storageclass="$first"
+    value="$second"
+  else
+    value="$first"
+  fi
+
+  if [[ -n "$validatefn" ]]; then
+    "$validatefn" "$value"
+  fi
+
+  eval "${varname}=\"\$value\""
 }
 
 while getopts 'hf:w:c:l:s:' opt; do
@@ -75,27 +127,12 @@ while getopts 'hf:w:c:l:s:' opt; do
       opt_crit="$OPTARG"
       ;;
     l)
-      if [[ "$OPTARG" != ?*=* ]]; then
-        echo 'Label must be at least one character followed by an equal sign' \
-          'and a value' >&2
-        exit "$state_critical"
-      fi
-      push_limit "$opt_label" "$opt_capacity" "$opt_warn" "$opt_crit"
-      opt_label="$OPTARG"
-      opt_capacity=
-      opt_warn=
-      opt_crit=
+      push_limit
+      reset_limit opt_label "$OPTARG" validate_key_value
       ;;
     s)
-      if [[ "$OPTARG" != [0-9]* ]]; then
-        echo 'Capacity must start with number' >&2
-        exit "$state_critical"
-      fi
-      push_limit "$opt_label" "$opt_capacity" "$opt_warn" "$opt_crit"
-      opt_label=
-      opt_capacity="$OPTARG"
-      opt_warn=
-      opt_crit=
+      push_limit
+      reset_limit opt_capacity "$OPTARG" validate_capacity
       ;;
     *)
       usage >&2
@@ -104,7 +141,7 @@ while getopts 'hf:w:c:l:s:' opt; do
   esac
 done
 
-push_limit "$opt_label" "$opt_capacity" "$opt_warn" "$opt_crit"
+push_limit
 
 shift $((OPTIND - 1))
 
@@ -137,6 +174,8 @@ metrics=()
 # https://docs.openshift.com/enterprise/3.2/rest_api/kubernetes_v1.html#v1-persistentvolumelist
 #
 # Arguments:
+# - storageclass: "*" to consider volumes of all storage classes, "" for the
+#     default storage class or an explicit class name
 # - labelval: Empty string to select all volumes or "label=value" to select
 #     volumes with given label set to given value
 # - capacity: Empty string to select all capacities or value to select volumes
@@ -144,6 +183,7 @@ metrics=()
 # - *args: Volume UIDs to exclude
 #
 filter_volumes() {
+  local storageclass="$1"; shift
   local labelval="$1"; shift
   local capacity="$1"; shift
   local label=
@@ -160,9 +200,14 @@ filter_volumes() {
     . as $cur |
     select(
       (
-        ($cur.metadata.annotations["pv.kubernetes.io/provisioned-by"] // null) or
-        (($exclude_uid | index($cur.metadata.uid)) != null)
-      ) | not
+        ($storageclass == "*") or
+        ($cur.spec.storageClassName // "") == $storageclass
+      ) and (
+        (
+          ($cur.metadata.annotations["pv.kubernetes.io/provisioned-by"] // null) or
+          (($exclude_uid | index($cur.metadata.uid)) != null)
+        ) | not
+      )
     )
   '
   if [[ -n "$labelval" ]]; then
@@ -176,6 +221,7 @@ filter_volumes() {
   jqfilter+=']'
 
   jq --raw-output \
+    --arg storageclass "$storageclass" \
     --argjson exclude_uid "[$(join_args ', ' ${exclude_uid[@]+"${exclude_uid[@]}"})]" \
     "$jqfilter"
 }
@@ -189,19 +235,20 @@ get_obj_uids() {
 }
 
 #
-# Count volumes (v1.PersistentVolume) grouped by capacity
+# Count volumes (v1.PersistentVolume) grouped by capacity and storage class
 #
 calc_stats() {
   jq -r '
-    group_by(.spec.capacity.storage) |
+    group_by(.spec.storageClassName, .spec.capacity.storage) |
     map({
+      storageclass: (.[0].spec.storageClassName // ""),
       capacity: .[0].spec.capacity.storage,
       total: length,
       avail: [.[] | select(.status.phase == "Available")] | length,
     }) |
-    sort_by(.capacity) |
+    sort_by(.storageclass, .capacity) |
     .[] |
-    @sh "capacity=\(.capacity) total=\(.total) avail=\(.avail)"
+    @sh "storageclass=\(.storageclass) capacity=\(.capacity) total=\(.total) avail=\(.avail)"
   '
 }
 
@@ -210,7 +257,7 @@ calc_stats() {
 #
 check() {
   local labelval="$1" capacity="$2" warn="$3" crit="$4"
-  local status
+  local status scmetric scoutput
 
   calc_stats > "$tmpdir/stats.txt"
 
@@ -219,8 +266,18 @@ check() {
 
     used=$(( total - avail ))
 
+    if [[ -z "$storageclass" ]]; then
+      scmetric=
+      scoutput=" in default class"
+    else
+      scmetric="${storageclass}-"
+      scoutput=" in class \"${storageclass}\""
+    fi
+
     # http://docs.icinga.org/latest/en/perfdata.html#perfdata-format
-    metrics+=( "'${labelval:+${labelval//=/-}-}$capacity'=${used};${warn};${crit};0;${total}" )
+    metrics+=(
+      "'${scmetric}${labelval:+${labelval//=/-}-}${capacity}'=${used};${warn};${crit};0;${total}"
+      )
 
     if [[ -n "$crit" && "$avail" -lt "$crit" ]]; then
       status=$state_critical
@@ -231,7 +288,9 @@ check() {
     fi
 
     if [[ "$status" != $state_ok ]]; then
-      output+=( "${labelval:+[$labelval] }$avail of $total volumes with $capacity available" )
+      output+=(
+        "${labelval:+[$labelval] }$avail of $total volumes with $capacity available${scoutput}"
+        )
     fi
 
     exit_status=$(merge_status "$exit_status" "$status")
@@ -241,10 +300,10 @@ check() {
 processed=()
 
 for line in ${limits[@]+"${limits[@]}"}; do
-  IFS=';' read labelval capacity warn crit _ <<< "$line"
+  IFS=';' read storageclass labelval capacity warn crit _ <<< "$line"
 
   # Find matching disks
-  filter_volumes "$labelval" "$capacity" ${processed[@]+"${processed[@]}"} \
+  filter_volumes "$storageclass" "$labelval" "$capacity" ${processed[@]+"${processed[@]}"} \
     < "$tmpdir/pv.json" > "$tmpdir/matching.json"
 
   processed+=( $(get_obj_uids < "$tmpdir/matching.json") )
@@ -253,7 +312,7 @@ for line in ${limits[@]+"${limits[@]}"}; do
 done
 
 # Process remaining volumes, i.e. those not explicitly requested by label value
-filter_volumes '' '' ${processed[@]+"${processed[@]}"} \
+filter_volumes '*' '' '' ${processed[@]+"${processed[@]}"} \
   < "$tmpdir/pv.json" > "$tmpdir/matching.json"
 
 IFS=';' read warn crit _ <<< "$default_limits"
