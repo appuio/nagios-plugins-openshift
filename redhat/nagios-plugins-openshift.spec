@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.13.0
+Version: 0.13.1
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -54,6 +54,10 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Fri Apr 27 2018 Michael Hanselmann <hansmi@vshn.ch> 0.13.1-1
+- Expose count over all pod phases in "check_openshift_project_pod_phase" as
+  Icinga2 variable.
+
 * Thu Apr 26 2018 Michael Hanselmann <hansmi@vshn.ch> 0.13.0-1
 - Add "check_openshift_project_pod_phase" script to observe pod phase (pending,
   running, etc.) of all pods on a cluster.
