@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.13.1
+Version: 0.14.0
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -54,6 +54,18 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Fri May 4 2018 Michael Hanselmann <hansmi@vshn.ch> 0.14.0-1
+- check_openshift_pv_avail: The selector options "-l" and "-s" now support an
+  optional storage class, separated from the value by a comma. To retain the
+  existing selection behaviour they apply to all classes by default. Metrics
+  are grouped by storage class and storage classes are included in
+  human-readable output.
+- check_openshift_pvc_phase: Show the storage class for pending and lost volume
+  claims. Fail with a critical state when a claim is older than an hour.
+- Fix typo in "openshift_pod_count" command definition: the
+  "openshift_pod_count_crit" Icinga2 variable would overwrite the parameter for
+  setting the warning limit.
+
 * Fri Apr 27 2018 Michael Hanselmann <hansmi@vshn.ch> 0.13.1-1
 - Expose count over all pod phases in "check_openshift_project_pod_phase" as
   Icinga2 variable.

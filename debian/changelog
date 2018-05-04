@@ -1,3 +1,19 @@
+nagios-plugins-openshift (0.14.0) trusty; urgency=medium
+
+  * check_openshift_pv_avail: The selector options "-l" and "-s" now support
+    an optional storage class, separated from the value by a comma. To retain
+    the existing selection behaviour they apply to all classes by default.
+    Metrics are grouped by storage class and storage classes are included in
+    human-readable output.
+  * check_openshift_pvc_phase: Show the storage class for pending and lost
+    volume claims. Fail with a critical state when a claim is older than an
+    hour.
+  * Fix typo in "openshift_pod_count" command definition: the
+    "openshift_pod_count_crit" Icinga2 variable would overwrite the parameter
+    for setting the warning limit.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Fri, 04 May 2018 13:24:48 +0200
+
 nagios-plugins-openshift (0.13.1) trusty; urgency=medium
 
   * Expose count over all pod phases in "check_openshift_project_pod_phase" as
