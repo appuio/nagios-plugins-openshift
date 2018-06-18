@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.14.0
+Version: 0.14.1
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -54,6 +54,11 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Mon Jun 18 2018 Michael Hanselmann <hansmi@vshn.ch> 0.14.1-1
+- Icinga check command "openshift_node_resources": Replace lambdas in "skip_if"
+  with direct access to runtime macros. Now arguments are passed onto the check
+  script even if they're not a string.
+
 * Fri May 4 2018 Michael Hanselmann <hansmi@vshn.ch> 0.14.0-1
 - check_openshift_pv_avail: The selector options "-l" and "-s" now support an
   optional storage class, separated from the value by a comma. To retain the

@@ -1,3 +1,11 @@
+nagios-plugins-openshift (0.14.1) trusty; urgency=medium
+
+  * Icinga check command "openshift_node_resources": Replace lambdas in
+    "skip_if" with direct access to runtime macros. Now arguments are passed
+    onto the check script even if they're not a string.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Mon, 18 Jun 2018 17:51:02 +0200
+
 nagios-plugins-openshift (0.14.0) trusty; urgency=medium
 
   * check_openshift_pv_avail: The selector options "-l" and "-s" now support
