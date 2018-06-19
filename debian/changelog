@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.14.2) trusty; urgency=medium
+
+  * Fix a bug introduced in version 0.14.1: Selector arguments for check
+    commands were silently skipped. Only a warning was logged.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Tue, 19 Jun 2018 15:17:17 +0200
+
 nagios-plugins-openshift (0.14.1) trusty; urgency=medium
 
   * Icinga check command "openshift_node_resources": Replace lambdas in
