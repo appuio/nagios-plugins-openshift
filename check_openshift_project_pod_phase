@@ -19,9 +19,13 @@ usage() {
     'value'
   echo
   echo 'Metric names for limits with phase in lowercase:'
-  echo ' - global.<phase>'
-  echo ' - all.project.<phase>'
-  echo ' - project.<namespace>.<phase>'
+  echo ' - global.<phase>: Number of pods in given phase in whole cluster' \
+    '(sum over all projects)'
+  echo ' - all.project.<phase>: Number of pods in given phase in any project' \
+    'if not explicitly configured for project/phase combination (count per' \
+    'project)'
+  echo ' - project.<namespace>.<phase>: Number of pods in given phase in' \
+    'a specific project'
 }
 
 tmpdir=$(mktemp -d)
