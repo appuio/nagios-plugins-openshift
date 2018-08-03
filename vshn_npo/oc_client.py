@@ -26,15 +26,17 @@ class ProjectNamer:
   def prefix(self):
     return self._prefix
 
-  def make_name(self):
+  def make_name(self, timestamp):
     """Generate a new, usually unique name.
+
+    :param timestamp: Optional timestamp to include in name.
 
     """
     # UUIDs are for all intents and purposes guaranteed to be unique
     suffix = (base64.b32encode(uuid.uuid4().bytes).decode("UTF-8").
         rstrip("=").lower())
 
-    return "{}-{}-{}".format(self._prefix, int(time.time()), suffix)
+    return "{}-{}-{}".format(self._prefix, int(timestamp), suffix)
 
   @staticmethod
   def parse(name):
@@ -153,11 +155,12 @@ def create_project(client, namer):
 
   """
   def inner(client, namer):
-    project_name = namer.make_name()
+    timestamp = time.time()
+    project_name = namer.make_name(timestamp)
 
     try:
       client.run(["new-project",
-        "--display-name=End-to-end {}".format(time.ctime()),
+        "--display-name=End-to-end {}".format(time.ctime(timestamp)),
         project_name,
         ])
     except subprocess.CalledProcessError as err:
