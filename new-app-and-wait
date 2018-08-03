@@ -111,17 +111,15 @@ def check_url_anyip(url, pattern, timeout):
 
 
 class ExpectedPatternContext(retry.UrlWaitContext):
-  def __init__(self, info_fn, pattern):
+  def __init__(self, pattern):
     super(ExpectedPatternContext, self).__init__()
 
-    self._info_fn = info_fn
     self._pattern = pattern
 
-  def before_request(self):
-    if self._info_fn:
-      self._info_fn()
-
   def check_response(self, resp):
+    """Fail unless response contains pattern caller is looking for.
+
+    """
     super(ExpectedPatternContext, self).check_response(resp)
 
     if not self._pattern.search(resp.text):
@@ -159,8 +157,7 @@ def Check(client, args, timeout):
   url = "http://{}{}".format(host, args.path)
 
   # Wait until application becomes available
-  info_fn = functools.partial(client.run, ["deploy", appname])
-  ctx = ExpectedPatternContext(info_fn, args.pattern)
+  ctx = ExpectedPatternContext(args.pattern)
 
   logging.info("Waiting for %s to match pattern %r", url, args.pattern)
 
