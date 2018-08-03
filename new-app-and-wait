@@ -249,6 +249,7 @@ def main():
     cl = oc_client.Client(args.oc, cfgfile)
 
     cl.run(["whoami"])
+    cl.run(["version"])
 
     namer = oc_client.ProjectNamer(args.project_prefix)
 
