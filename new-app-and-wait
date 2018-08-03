@@ -256,7 +256,7 @@ def main():
     namer = oc_client.ProjectNamer(args.project_prefix)
 
     # Get rid of old projects
-    oc_client.cleanup_projects(cl, namer, 2 * args.critical, 24 * 3600)
+    oc_client.cleanup_projects(cl, namer, 2 * args.critical)
 
     timeout = utils.Timeout(max(args.warning, args.critical))
 
