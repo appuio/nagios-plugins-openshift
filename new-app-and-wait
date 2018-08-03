@@ -174,12 +174,16 @@ def get_names(client, kind):
 
 
 def collect_logs_inner(client, kind, has_logs):
-  for name in sorted(get_names(client, kind)):
-    client.run(["describe", "--show-events", name], ignore_errors=True)
+  names = sorted(get_names(client, kind))
+
+  logging.debug("Objects of type %r: %r", kind, names)
+
+  for i in names:
+    client.run(["describe", "--show-events", i], ignore_errors=True)
 
     if has_logs:
-      logging.debug("Logs for %r", name)
-      client.run(["logs", "--timestamps", name], ignore_errors=True)
+      logging.debug("Logs for %r", i)
+      client.run(["logs", "--timestamps", i], ignore_errors=True)
 
 
 def collect_logs(client):
