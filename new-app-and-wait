@@ -187,6 +187,7 @@ def collect_logs(client):
 
   for kind in [
       "build",
+      "deployment",
       "deploymentconfig",
       "replicationcontroller",
       "pod",
