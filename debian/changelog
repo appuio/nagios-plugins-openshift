@@ -1,3 +1,18 @@
+nagios-plugins-openshift (0.14.3) trusty; urgency=medium
+
+  project_pod_phase:
+  * Metric descriptions have been amended with more details.
+
+  new-app-and-wait:
+  * Client and server versions are output for logging.
+  * Deployment logs are collected before project removal.
+  * Avoid triggering deployment explicitly ("oc deploy") and rely on default
+    triggers instead.
+  * Only projects with configured prefix ("e2e" by default) are removed, not
+    all visible to the end-to-end test user.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Mon, 06 Aug 2018 16:52:44 +0200
+
 nagios-plugins-openshift (0.14.2) trusty; urgency=medium
 
   * Fix a bug introduced in version 0.14.1: Selector arguments for check

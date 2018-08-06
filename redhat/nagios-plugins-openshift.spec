@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.14.2
+Version: 0.14.3
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -54,6 +54,17 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Mon Aug 6 2018 Michael Hanselmann <hansmi@vshn.ch> 0.14.3-1
+- project_pod_phase:
+  - Metric descriptions have been amended with more details.
+- new-app-and-wait:
+  - Client and server versions are output for logging.
+  - Deployment logs are collected before project removal.
+  - Avoid triggering deployment explicitly ("oc deploy") and rely on default
+    triggers instead.
+  - Only projects with configured prefix ("e2e" by default) are removed, not
+    all visible to the end-to-end test user.
+
 * Tue Jun 19 2018 Michael Hanselmann <hansmi@vshn.ch> 0.14.2-1
 - Fix a bug introduced in version 0.14.1: Selector arguments for check commands
   were silently skipped. Only a warning was logged.
