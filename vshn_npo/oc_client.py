@@ -26,15 +26,17 @@ class ProjectNamer:
   def prefix(self):
     return self._prefix
 
-  def make_name(self):
+  def make_name(self, timestamp):
     """Generate a new, usually unique name.
+
+    :param timestamp: Optional timestamp to include in name.
 
     """
     # UUIDs are for all intents and purposes guaranteed to be unique
     suffix = (base64.b32encode(uuid.uuid4().bytes).decode("UTF-8").
         rstrip("=").lower())
 
-    return "{}-{}-{}".format(self._prefix, int(time.time()), suffix)
+    return "{}-{}-{}".format(self._prefix, int(timestamp), suffix)
 
   @staticmethod
   def parse(name):
@@ -153,11 +155,12 @@ def create_project(client, namer):
 
   """
   def inner(client, namer):
-    project_name = namer.make_name()
+    timestamp = time.time()
+    project_name = namer.make_name(timestamp)
 
     try:
       client.run(["new-project",
-        "--display-name=End-to-end {}".format(time.ctime()),
+        "--display-name=End-to-end {}".format(time.ctime(timestamp)),
         project_name,
         ])
     except subprocess.CalledProcessError as err:
@@ -187,18 +190,17 @@ def delete_project(client, name, ignore_errors=False):
     ], ignore_errors=ignore_errors)
 
 
-def cleanup_projects(client, namer, named_max_age, max_age):
+def cleanup_projects(client, namer, named_max_age):
   """Remove old projects.
 
   :param namer: An instance of :class:`ProjectNamer`
-  :param named_max_age: Remove projects older than this amount of seconds
-    if their name matches the prefix of :param:`namer`.
-  :param max_age: Remove any project older than this amount of seconds.
+  :param named_max_age: Remove projects older than given amount of seconds if
+    their name matches the prefix of :param:`namer`.
 
   """
-  logging.debug(("Removing any project older than %0.0f seconds or"
-                 " %0.0f seconds if the name prefix is \"%s\""),
-                max_age, named_max_age, namer.prefix)
+  logging.debug(("Removing any project with name prefix %r older than %d"
+                 " seconds"),
+                namer.prefix, named_max_age)
 
   data = client.capture_json(["get", "--output=json", "projects"])
 
@@ -210,14 +212,18 @@ def cleanup_projects(client, namer, named_max_age, max_age):
     parts = namer.parse(name)
 
     if parts is None:
-      # Unrecognized prefix or invalid timestamp
-      prefix = None
-      ts = 0
-    else:
-      (prefix, ts) = parts
+      logging.warning("Project name %r can't be parsed", name)
+      continue
 
-    if ts < (now - (named_max_age if prefix == namer.prefix else max_age)):
-      logging.info("Cleaning up project \"%s\" from %s", name, time.ctime(ts))
+    (prefix, ts) = parts
+
+    if prefix != namer.prefix:
+      logging.warning("Ignoring project %r with unrecognized prefix %r",
+                      name, prefix)
+      continue
+
+    if ts < (now - named_max_age):
+      logging.info("Cleaning up project %r from %s", name, time.ctime(ts))
       delete_project(client, name)
 
 # vim: set sw=2 sts=2 et :

@@ -111,17 +111,15 @@ def check_url_anyip(url, pattern, timeout):
 
 
 class ExpectedPatternContext(retry.UrlWaitContext):
-  def __init__(self, info_fn, pattern):
+  def __init__(self, pattern):
     super(ExpectedPatternContext, self).__init__()
 
-    self._info_fn = info_fn
     self._pattern = pattern
 
-  def before_request(self):
-    if self._info_fn:
-      self._info_fn()
-
   def check_response(self, resp):
+    """Fail unless response contains pattern caller is looking for.
+
+    """
     super(ExpectedPatternContext, self).check_response(resp)
 
     if not self._pattern.search(resp.text):
@@ -159,8 +157,7 @@ def Check(client, args, timeout):
   url = "http://{}{}".format(host, args.path)
 
   # Wait until application becomes available
-  info_fn = functools.partial(client.run, ["deploy", appname])
-  ctx = ExpectedPatternContext(info_fn, args.pattern)
+  ctx = ExpectedPatternContext(args.pattern)
 
   logging.info("Waiting for %s to match pattern %r", url, args.pattern)
 
@@ -174,12 +171,16 @@ def get_names(client, kind):
 
 
 def collect_logs_inner(client, kind, has_logs):
-  for name in sorted(get_names(client, kind)):
-    client.run(["describe", "--show-events", name], ignore_errors=True)
+  names = sorted(get_names(client, kind))
+
+  logging.debug("Objects of type %r: %r", kind, names)
+
+  for i in names:
+    client.run(["describe", "--show-events", i], ignore_errors=True)
 
     if has_logs:
-      logging.debug("Logs for %r", name)
-      client.run(["logs", "--timestamps", name], ignore_errors=True)
+      logging.debug("Logs for %r", i)
+      client.run(["logs", "--timestamps", i], ignore_errors=True)
 
 
 def collect_logs(client):
@@ -187,6 +188,7 @@ def collect_logs(client):
 
   for kind in [
       "build",
+      "deployment",
       "deploymentconfig",
       "replicationcontroller",
       "pod",
@@ -249,11 +251,12 @@ def main():
     cl = oc_client.Client(args.oc, cfgfile)
 
     cl.run(["whoami"])
+    cl.run(["version"])
 
     namer = oc_client.ProjectNamer(args.project_prefix)
 
     # Get rid of old projects
-    oc_client.cleanup_projects(cl, namer, 2 * args.critical, 24 * 3600)
+    oc_client.cleanup_projects(cl, namer, 2 * args.critical)
 
     timeout = utils.Timeout(max(args.warning, args.critical))
 
