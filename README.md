@@ -35,11 +35,6 @@ Check status of all certificates managed and reported on by [OpenShift
 Ansible](https://github.com/openshift/openshift-ansible/).
 
 
-### `check_openshift_endtoend_result`
-
-Interpret status file written by `logging-wrapper` together with `new-app-and-wait`.
-
-
 ### `check_openshift_es_stats`
 
 Collect statistics from Elasticsearch instance (i.e. part of the aggregated
