@@ -58,6 +58,12 @@ Check whether list of nodes in cluster matches passed list. Reports on
 unexpected and missing nodes.
 
 
+### `check_openshift_node_log_heartbeat`
+
+Query Elasticsearch to determine whether node has recently submitted
+timestamped log message to logging component.
+
+
 ### `check_openshift_node_resources`
 
 Check whether node resources (CPU, memory) are within given limits.

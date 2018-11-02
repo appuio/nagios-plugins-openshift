@@ -1,0 +1,308 @@
+#!/usr/bin/python3
+"""
+A Nagios plugin to verify Fluentd is working as expected. Looks for heartbeat
+log entries from the system log that should have made it to Elasticsearch via
+Fluentd.
+
+Age is the time difference between sending timestamp (relative to sending host)
+and querying time. Latency is the time difference between sending timestamp
+(relative to sending host) and receiving it in Elasticsearch (relative to
+logging system).
+
+"""
+
+import argparse
+import collections
+import datetime
+import dateutil.parser
+import math
+import nagiosplugin
+import re
+import requests
+import urllib.parse
+
+from vshn_npo import utils
+
+
+_ENTRY_MSG_RE = \
+    re.compile(r"(?i)\s*Logging\s+heartbeat\s+ts\s*=\s*(?P<ts>\d+)\s*$")
+
+
+def make_query(query_from, query_to, expected_hostcount):
+  """Return the search query for the JSON payload.
+
+  """
+  return {
+    "query": {
+      "constant_score": {
+        "filter": {
+          "bool": {
+            "filter": [
+              {
+                "range": {
+                  "@timestamp": {
+                    "gte": query_from.isoformat(),
+                    "lte": query_to.isoformat(),
+                  },
+                },
+              },
+              {
+                "term": {
+                  "systemd.u.SYSLOG_IDENTIFIER":
+                    "syslog-heartbeat-profile_openshift3",
+                },
+              },
+              {
+                "match": {
+                  "message": {
+                    # Exact match
+                    "type": "boolean",
+                    "operator": "and",
+                    "query": "Logging heartbeat ts",
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+    },
+
+    "aggs": {
+      # Create a bucket for each hostname
+      "hostname_buckets": {
+        "terms": {
+          "field": "hostname",
+          "size": expected_hostcount,
+        },
+
+        "aggs": {
+          # Most recent log entries per host
+          "most_recent_entry": {
+            "top_hits": {
+              "sort": [{
+                "@timestamp": {
+                  "order": "desc",
+                },
+              }],
+
+              # Number of entries to return for each host (more than one in
+              # case there are spurious, unrelated messages also matching the
+              # filter)
+              "size": 3,
+
+              # Fields to return
+              "_source": {
+                "includes": [
+                  "@timestamp",
+                  "hostname",
+                  "message",
+                ],
+              },
+            },
+          },
+        },
+      },
+    },
+  }
+
+
+class NodeNameContext(nagiosplugin.Context):
+  def __init__(self, name, nodes):
+    super().__init__(name)
+    self._nodes = nodes
+
+  def evaluate(self, metric, resource):
+    expected = frozenset(self._nodes)
+    actual = frozenset(metric.value)
+
+    missing = expected - actual
+
+    if missing:
+      hint = ("Node(s) not reporting heartbeat or not contained in query"
+              " result: {}".
+              format(", ".join(sorted(missing))))
+
+      return self.result_cls(nagiosplugin.Critical, hint=hint, metric=metric)
+
+    # Extraneous nodes are not reported as they may send logs for as long as
+    # they wish
+
+    return self.result_cls(nagiosplugin.Ok, metric=metric)
+
+
+class LogEntry(collections.namedtuple("LogEntry", [
+  "hostname",
+  "entry_timestamp",
+  "heartbeat_timestamp",
+  ])):
+  @property
+  def latency(self):
+    return self.entry_timestamp - self.heartbeat_timestamp
+
+  @classmethod
+  def from_search_hit(cls, fields):
+    m = _ENTRY_MSG_RE.match(fields["message"])
+    if not m:
+      return None
+
+    entry_timestamp = dateutil.parser.parse(fields["@timestamp"])
+    heartbeat_timestamp = \
+        datetime.datetime.fromtimestamp(int(m.group("ts")),
+                                        datetime.timezone.utc)
+
+    return cls(fields["hostname"], entry_timestamp, heartbeat_timestamp)
+
+
+class Heartbeat(nagiosplugin.Resource):
+  """Query Fluentd heartbeat information from Elasticsearch.
+
+  """
+  def __init__(self, endpoint, auth_token, query_timeout, query_duration, expected_hostcount):
+    self._query_duration = query_duration
+    self._expected_hostcount = expected_hostcount
+
+    # * = YYYY.MM.DD (e.g. "2018.05.11")
+    index = ".operations.*"
+
+    self._url = "{}/{}/_search?{}".format(
+      endpoint,
+      urllib.parse.quote(index),
+      urllib.parse.urlencode({
+        "timeout": "{}s".format(query_timeout),
+        "ignore_unavailable": "true",
+
+        # Only aggregation results are used
+        "size": "0",
+      }),
+    )
+
+    self._headers = {
+      "Authorization": "Bearer {}".format(auth_token),
+
+      # Required by Kibana proxy
+      "kbn-xsrf": "dummy",
+    }
+
+  def probe(self):
+    """Verify that heartbeats are coming in every few minutes.
+
+    """
+    query_to = datetime.datetime.now(datetime.timezone.utc)
+    query_from = query_to - datetime.timedelta(seconds=self._query_duration)
+
+    query = make_query(query_from, query_to, self._expected_hostcount)
+
+    response = requests.post(self._url, headers=self._headers, json=query)
+    response.raise_for_status()
+
+    data = response.json()
+
+    hostname_buckets = data["aggregations"]["hostname_buckets"]
+
+    for (key, context) in [
+      ("sum_other_doc_count", "other-doc-count"),
+      ("doc_count_error_upper_bound", "default"),
+    ]:
+      yield nagiosplugin.Metric(key, hostname_buckets[key], context=context)
+
+    log_entries = []
+    found = set()
+
+    for i in hostname_buckets["buckets"]:
+      hits = i["most_recent_entry"]["hits"]["hits"]
+
+      # Use first entry only as the query result is sorted
+      if len(hits) < 1:
+        continue
+
+      le = LogEntry.from_search_hit(hits[0]["_source"])
+
+      if not (le is None or le.hostname in found):
+        found.add(le.hostname)
+        log_entries.append(le)
+
+    yield nagiosplugin.Metric("nodes", found, context="nodes")
+
+    for i in log_entries:
+      age = (query_to - i.heartbeat_timestamp).total_seconds()
+      latency = i.latency.total_seconds()
+
+      yield nagiosplugin.Metric("{}/age".format(i.hostname), age,
+                                context="heartbeat-age")
+      yield nagiosplugin.Metric("{}/latency".format(i.hostname), latency,
+                                context="heartbeat-latency")
+
+
+@nagiosplugin.guarded
+def main():
+  """
+  Entry point for script execution.
+  """
+  parser = argparse.ArgumentParser(
+      description=__doc__,
+      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+  utils.add_verbose_argument(parser)
+  parser.add_argument("nodes", nargs="+", metavar="NODE",
+                      help="List of nodes sending heartbeats")
+  parser.add_argument("--endpoint", required=True, metavar="URL",
+                      help="Elasticsearch API endpoint")
+  parser.add_argument("--warning", type=int, default=(5 * 60),
+                      metavar="THRESHOLD",
+                      help="Number of seconds recorded not receiving a"
+                           " heartbeat before triggering a warning status")
+  parser.add_argument("--critical", type=int, default=(15 * 60),
+                      metavar="THRESHOLD",
+                      help="Number of seconds recorded not receiving a"
+                           " heartbeat before triggering a critical status")
+  parser.add_argument("--latency-warning", type=int, default=30,
+                      metavar="THRESHOLD",
+                      help="Maximum latency in seconds before triggering"
+                           " a warning status")
+  parser.add_argument("--latency-critical", type=int, default=60,
+                      metavar="THRESHOLD",
+                      help="Maximum latency in seconds before triggering"
+                           " a critical status")
+  parser.add_argument("--query-timeout", type=int, default=30,
+                      metavar="SECONDS",
+                      help="Elasticsearch query timeout")
+
+  tokgroup = parser.add_mutually_exclusive_group(required=False)
+  tokgroup.add_argument("--token", help="Bearer token for authentication")
+  tokgroup.add_argument("--token-from", metavar="FILE",
+                        type=argparse.FileType(mode="r"),
+                        help=("Path to file containing bearer token for"
+                              " authentication"))
+  args = parser.parse_args()
+
+  utils.setup_basic_logging(args.verbose)
+
+  if args.token_from is None:
+    token = args.token
+  else:
+    token = args.token_from.read().rstrip()
+
+  query_duration = int(1.25 * max(args.warning, args.critical))
+
+  # Expected number of hosts (required to apply query to enough documents)
+  expected_hostcount = int(1.5 * len(args.nodes))
+
+  check = nagiosplugin.Check(
+    Heartbeat(args.endpoint, token, args.query_timeout, query_duration,
+              expected_hostcount),
+    nagiosplugin.ScalarContext("other-doc-count", warning="0"),
+    nagiosplugin.ScalarContext("heartbeat-age",
+                               warning=args.warning,
+                               critical=args.critical),
+    nagiosplugin.ScalarContext("heartbeat-latency",
+                               warning=args.latency_warning,
+                               critical=args.latency_critical),
+    NodeNameContext("nodes", args.nodes),
+  )
+  check.main(verbose=args.verbose, timeout=None)
+
+
+if __name__ == "__main__":
+  main()
+
+# vim: set sw=2 sts=2 et :
