@@ -136,7 +136,8 @@ class HawkularClient(object):
         time.sleep(delay)
 
       try:
-        req = self._session.get(url, headers=headers, params=params, timeout=self._timeout)
+        req = self._session.get(url, headers=headers, params=params,
+                                timeout=self._timeout, allow_redirects=False)
       except requests.exceptions.Timeout as err:
         if attempt < self._retries:
           logging.debug("Connection timed out: %s", err)

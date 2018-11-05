@@ -185,4 +185,12 @@ def extract_token_argument(args):
   return args.token_from.read().rstrip()
 
 
+def raise_for_elasticsearch_response(resp):
+  resp.raise_for_status()
+
+  if resp.is_redirect:
+    raise Exception("Unexpected redirect with status code {}".
+                    format(resp.status_code))
+
+
 # vim: set sw=2 sts=2 et :

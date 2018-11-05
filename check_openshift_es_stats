@@ -69,8 +69,8 @@ class StatsQuery(nagiosplugin.Resource):
         "Authorization": "Bearer {}".format(self._token),
         }
 
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
+    response = requests.get(url, headers=headers, allow_redirects=False)
+    utils.raise_for_elasticsearch_response(response)
 
     data = response.json()
 
