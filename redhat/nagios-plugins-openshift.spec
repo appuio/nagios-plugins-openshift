@@ -10,7 +10,6 @@ Packager: Michael Hanselmann <hansmi@vshn.ch>
 BuildRequires: python34-devel
 Requires: bash
 Requires: curl >= 7.21.3
-# TODO: daemontools for end-to-end tests (systemd unit?)
 Requires: nagios-plugins-dns
 Requires: openshift-origin-client-tools >= 3.7.2
 Requires: jq >= 1.5

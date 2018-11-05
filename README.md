@@ -35,11 +35,6 @@ Check status of all certificates managed and reported on by [OpenShift
 Ansible](https://github.com/openshift/openshift-ansible/).
 
 
-### `check_openshift_endtoend_result`
-
-Interpret status file written by `logging-wrapper` together with `new-app-and-wait`.
-
-
 ### `check_openshift_es_stats`
 
 Collect statistics from Elasticsearch instance (i.e. part of the aggregated
@@ -61,6 +56,12 @@ machine.
 
 Check whether list of nodes in cluster matches passed list. Reports on
 unexpected and missing nodes.
+
+
+### `check_openshift_node_log_heartbeat`
+
+Query Elasticsearch to determine whether node has recently submitted
+timestamped log message to logging component.
 
 
 ### `check_openshift_node_resources`
