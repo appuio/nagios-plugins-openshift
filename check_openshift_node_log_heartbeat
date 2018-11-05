@@ -210,17 +210,12 @@ class Heartbeat(nagiosplugin.Resource):
     found = set()
 
     for i in hostname_buckets["buckets"]:
-      hits = i["most_recent_entry"]["hits"]["hits"]
+      for j in i["most_recent_entry"]["hits"]["hits"]:
+        le = LogEntry.from_search_hit(j["_source"])
 
-      # Use first entry only as the query result is sorted
-      if len(hits) < 1:
-        continue
-
-      le = LogEntry.from_search_hit(hits[0]["_source"])
-
-      if not (le is None or le.hostname in found):
-        found.add(le.hostname)
-        log_entries.append(le)
+        if not (le is None or le.hostname in found):
+          found.add(le.hostname)
+          log_entries.append(le)
 
     yield nagiosplugin.Metric("nodes", found, context="nodes")
 
