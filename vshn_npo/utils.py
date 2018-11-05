@@ -1,3 +1,4 @@
+import argparse
 import contextlib
 import io
 import time
@@ -163,6 +164,25 @@ def setup_basic_logging(verbose):
     level = logging.CRITICAL
 
   logging.basicConfig(level=level)
+
+
+def add_token_arguments(parser):
+  tokgroup = parser.add_mutually_exclusive_group(required=False)
+  tokgroup.add_argument("--token", help="Bearer token for authentication")
+  tokgroup.add_argument("--token-from", metavar="FILE",
+                        type=argparse.FileType(mode="r"),
+                        help=("Path to file containing bearer token for"
+                              " authentication"))
+
+
+def extract_token_argument(args):
+  """Return token specified on command line.
+
+  """
+  if args.token_from is None:
+    return args.token
+
+  return args.token_from.read().rstrip()
 
 
 # vim: set sw=2 sts=2 et :

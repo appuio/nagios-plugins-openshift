@@ -1,4 +1,3 @@
-import argparse
 import itertools
 import logging
 import requests
@@ -6,6 +5,8 @@ import time
 import urllib.parse
 import collections
 from email.utils import parsedate_tz, mktime_tz
+
+from . import utils
 
 
 # Retry request if one of these status codes was received
@@ -164,19 +165,13 @@ def setup_argument_parser(parser):
   :param parser: An instance of :class:`argparse.ArgumentParser`
 
   """
+  utils.add_token_arguments(parser)
+
   group = parser.add_argument_group(title="API client")
   group.add_argument("--endpoint", required=True, metavar="URL",
                      help="API endpoint")
   group.add_argument("--tenant", default="_system", metavar="NAME",
                      help="Hawkular tenant")
-
-  tokgroup = group.add_mutually_exclusive_group(required=False)
-  tokgroup.add_argument("--token", help="Bearer token for authentication")
-  tokgroup.add_argument("--token-from", metavar="PATH",
-                        type=argparse.FileType(mode="r"),
-                        help=("Path to file containing bearer token for"
-                              " authentication"))
-
   group.add_argument("--timeout", type=int, default=10, metavar="SEC",
                      help="Request timeout in seconds")
   group.add_argument("--query-retries", type=int, default=3, metavar="N",
@@ -190,13 +185,8 @@ def make_client(args):
     :func:`argparse.ArgumentParser.parse_args` and related functions
 
   """
-  if args.token_from is not None:
-    token = args.token_from.read().rstrip()
-  else:
-    token = args.token
-
   client = HawkularClient(args.endpoint, args.tenant)
-  client.token = token
+  client.token = utils.extract_token_argument(args)
   client.timeout = args.timeout
   client.retries = args.query_retries
   return client
