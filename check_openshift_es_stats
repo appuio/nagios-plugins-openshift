@@ -69,8 +69,8 @@ class StatsQuery(nagiosplugin.Resource):
         "Authorization": "Bearer {}".format(self._token),
         }
 
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
+    response = requests.get(url, headers=headers, allow_redirects=False)
+    utils.raise_for_elasticsearch_response(response)
 
     data = response.json()
 
@@ -95,6 +95,7 @@ class StatsQuery(nagiosplugin.Resource):
 def main():
   parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
   utils.add_verbose_argument(parser)
+  utils.add_token_arguments(parser)
   parser.add_argument("--strip-hostname-prefix", metavar="PREFIX",
                       default="logging-es-",
                       help="Strip given prefix from node names")
@@ -114,21 +115,11 @@ def main():
   parser.add_argument("--endpoint", required=True, metavar="URL",
                       help="API endpoint")
 
-  tokgroup = parser.add_mutually_exclusive_group(required=False)
-  tokgroup.add_argument("--token", help="Bearer token for authentication")
-  tokgroup.add_argument("--token-from", metavar="PATH",
-                        type=argparse.FileType(mode="r"),
-                        help=("Path to file containing bearer token for"
-                              " authentication"))
-
   args = parser.parse_args()
 
   utils.setup_basic_logging(args.verbose)
 
-  if args.token_from is not None:
-    token = args.token_from.read().rstrip()
-  else:
-    token = args.token
+  token = utils.extract_token_argument(args)
 
   checks = [
       StatsQuery(args.endpoint, token, args.strip_hostname_prefix),

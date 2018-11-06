@@ -193,8 +193,9 @@ class Heartbeat(nagiosplugin.Resource):
 
     query = make_query(query_from, query_to, self._expected_hostcount)
 
-    response = requests.post(self._url, headers=self._headers, json=query)
-    response.raise_for_status()
+    response = requests.post(self._url, headers=self._headers, json=query,
+                             allow_redirects=False)
+    utils.raise_for_elasticsearch_response(response)
 
     data = response.json()
 
@@ -210,17 +211,12 @@ class Heartbeat(nagiosplugin.Resource):
     found = set()
 
     for i in hostname_buckets["buckets"]:
-      hits = i["most_recent_entry"]["hits"]["hits"]
+      for j in i["most_recent_entry"]["hits"]["hits"]:
+        le = LogEntry.from_search_hit(j["_source"])
 
-      # Use first entry only as the query result is sorted
-      if len(hits) < 1:
-        continue
-
-      le = LogEntry.from_search_hit(hits[0]["_source"])
-
-      if not (le is None or le.hostname in found):
-        found.add(le.hostname)
-        log_entries.append(le)
+        if not (le is None or le.hostname in found):
+          found.add(le.hostname)
+          log_entries.append(le)
 
     yield nagiosplugin.Metric("nodes", found, context="nodes")
 
@@ -243,6 +239,7 @@ def main():
       description=__doc__,
       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
   utils.add_verbose_argument(parser)
+  utils.add_token_arguments(parser)
   parser.add_argument("nodes", nargs="+", metavar="NODE",
                       help="List of nodes sending heartbeats")
   parser.add_argument("--endpoint", required=True, metavar="URL",
@@ -266,21 +263,11 @@ def main():
   parser.add_argument("--query-timeout", type=int, default=30,
                       metavar="SECONDS",
                       help="Elasticsearch query timeout")
-
-  tokgroup = parser.add_mutually_exclusive_group(required=False)
-  tokgroup.add_argument("--token", help="Bearer token for authentication")
-  tokgroup.add_argument("--token-from", metavar="FILE",
-                        type=argparse.FileType(mode="r"),
-                        help=("Path to file containing bearer token for"
-                              " authentication"))
   args = parser.parse_args()
 
   utils.setup_basic_logging(args.verbose)
 
-  if args.token_from is None:
-    token = args.token
-  else:
-    token = args.token_from.read().rstrip()
+  token = utils.extract_token_argument(args)
 
   query_duration = int(1.25 * max(args.warning, args.critical))
 
