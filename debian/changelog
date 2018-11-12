@@ -1,3 +1,11 @@
+nagios-plugins-openshift (0.15.0) trusty; urgency=medium
+
+  * Removed "logging-wrapper" script as it didn't work on RHEL/CentOS.
+  * Added new script named "check_openshift_node_log_heartbeat" to check
+    Elasticsearch for recent timestamp written to logs on all nodes.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Mon, 12 Nov 2018 15:35:01 +0100
+
 nagios-plugins-openshift (0.14.3) trusty; urgency=medium
 
   project_pod_phase:
