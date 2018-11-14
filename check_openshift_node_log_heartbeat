@@ -229,6 +229,12 @@ class Heartbeat(nagiosplugin.Resource):
       yield nagiosplugin.Metric("{}/latency".format(i.hostname), latency,
                                 uom="s",
                                 context="heartbeat-latency")
+      yield nagiosplugin.Metric("{}/ts/heartbeat".format(i.hostname),
+                                i.heartbeat_timestamp.timestamp(),
+                                context="default")
+      yield nagiosplugin.Metric("{}/ts/entry".format(i.hostname),
+                                i.entry_timestamp.timestamp(),
+                                context="default")
 
 
 @nagiosplugin.guarded
