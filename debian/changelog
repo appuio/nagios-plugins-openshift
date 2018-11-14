@@ -1,3 +1,11 @@
+nagios-plugins-openshift (0.15.1) trusty; urgency=medium
+
+  node_log_heartbeat:
+  * Add unit-of-measurement to metrics
+  * Emit log timestamps as metrics
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Wed, 14 Nov 2018 13:00:18 +0100
+
 nagios-plugins-openshift (0.15.0) trusty; urgency=medium
 
   * Removed "logging-wrapper" script as it didn't work on RHEL/CentOS.
