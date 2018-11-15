@@ -47,7 +47,11 @@ def make_query(query_from, query_to, expected_hostcount):
                 },
               },
               {
-                "term": {
+                # FIXME: In OpenShift Origin 3.9 the field is analyzed and
+                # can't be matched for exact equality. Must be switched to
+                # "term" once the field is no longer analyzed (as is the case
+                # in OpenShift Container Platform 3.9).
+                "match": {
                   "systemd.u.SYSLOG_IDENTIFIER":
                     "syslog-heartbeat-profile_openshift3",
                 },

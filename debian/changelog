@@ -1,3 +1,12 @@
+nagios-plugins-openshift (0.15.2) trusty; urgency=medium
+
+  node_log_heartbeat:
+  * Change part of the Elasticsearch filter from "term" to "match" query to
+    support differences in fields between OpenShift Origin 3.9 and OpenShift
+    Container Platform 3.9.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Thu, 15 Nov 2018 11:35:33 +0100
+
 nagios-plugins-openshift (0.15.1) trusty; urgency=medium
 
   node_log_heartbeat:

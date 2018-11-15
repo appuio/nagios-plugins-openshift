@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.15.1
+Version: 0.15.2
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -53,6 +53,12 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Thu Nov 15 2018 Michael Hanselmann <hansmi@vshn.ch> 0.15.2-1
+- node_log_heartbeat:
+  - Change part of the Elasticsearch filter from "term" to "match" query to
+    support differences in fields between OpenShift Origin 3.9 and OpenShift
+    Container Platform 3.9.
+
 * Wed Nov 14 2018 Michael Hanselmann <hansmi@vshn.ch> 0.15.1-1
 - node_log_heartbeat:
   - Add unit-of-measurement to metrics
