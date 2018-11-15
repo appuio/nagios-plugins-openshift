@@ -224,10 +224,17 @@ class Heartbeat(nagiosplugin.Resource):
       age = (query_to - i.heartbeat_timestamp).total_seconds()
       latency = i.latency.total_seconds()
 
-      yield nagiosplugin.Metric("{}/age".format(i.hostname), age,
+      yield nagiosplugin.Metric("{}/age".format(i.hostname), age, uom="s",
                                 context="heartbeat-age")
       yield nagiosplugin.Metric("{}/latency".format(i.hostname), latency,
+                                uom="s",
                                 context="heartbeat-latency")
+      yield nagiosplugin.Metric("{}/ts/heartbeat".format(i.hostname),
+                                i.heartbeat_timestamp.timestamp(),
+                                context="default")
+      yield nagiosplugin.Metric("{}/ts/entry".format(i.hostname),
+                                i.entry_timestamp.timestamp(),
+                                context="default")
 
 
 @nagiosplugin.guarded

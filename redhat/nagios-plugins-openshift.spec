@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.15.0
+Version: 0.15.1
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -53,6 +53,11 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Wed Nov 14 2018 Michael Hanselmann <hansmi@vshn.ch> 0.15.1-1
+- node_log_heartbeat:
+  - Add unit-of-measurement to metrics
+  - Emit log timestamps as metrics
+
 * Mon Nov 12 2018 Michael Hanselmann <hansmi@vshn.ch> 0.15.0-1
 - Removed "logging-wrapper" script as it didn't work on RHEL/CentOS.
 - Added new script named "check_openshift_node_log_heartbeat" to check
