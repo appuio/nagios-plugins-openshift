@@ -65,23 +65,44 @@ if ! msg=$(run_oc "$opt_cfgfile" get pod \
 fi
 
 jq -r '
-  .items |
-  map(select((.status.conditions // [])[] | select(.type == "Ready") | .status == "True")) |
-  group_by(.spec.nodeName) |
-  map([.[0].spec.nodeName, .[].metadata.name]) |
-  .[] |
-  @sh
+  (
+    .items |
+    map(select((.status.conditions // [])[] | select(.type == "Ready") | .status == "True"))
+  ) as $pods |
+  (
+    @sh "node_name= total_pod_count=\($pods | length)",
+    (
+      $pods | group_by(.spec.nodeName)[] |
+      @sh "node_name=\(.[0].spec.nodeName) pod_names=( \(map(.metadata.name) | sort) )"
+    )
+  )
 ' < "$tmpdir/pod.json" > "$tmpdir/pod.txt"
 
 exit_status="$state_ok"
 output=()
+limit=
 
 while read line; do
-  eval "set -- $line"
+  eval "$line"
 
-  if [[ "$#" -gt 2 ]]; then
-    # First element is node name
-    output+=( "two or more instances running on $1 (${*:2})" )
+  if [[ -z "${node_name:-}" ]]; then
+    # Line with information for all pods
+
+    # Calculate limit to complain if >50% are on single node
+    (( limit=((total_pod_count + 1) / 2) ))
+
+    # Apply arbitrary upper limit
+    if (( limit > 3 )); then
+      limit=3
+    fi
+
+    continue
+  fi
+
+  pod_count="${#pod_names[*]}"
+
+  if (( pod_count > limit )); then
+    output+=( "${pod_count} of ${total_pod_count} instances running on ${node_name} (${pod_names[*]})" )
     exit_status=$(merge_status "$exit_status" "$state_critical")
   fi
 done < "$tmpdir/pod.txt"
