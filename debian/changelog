@@ -1,3 +1,12 @@
+nagios-plugins-openshift (0.15.3) trusty; urgency=medium
+
+  pod_node_alloc:
+  * Changed decision logic to only complain if either >50% or >3 of pods are
+    on a single node. This way three-replica deployments are considered okay
+    if they have two pods on a single node.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Fri, 23 Nov 2018 13:05:41 +0100
+
 nagios-plugins-openshift (0.15.2) trusty; urgency=medium
 
   node_log_heartbeat:

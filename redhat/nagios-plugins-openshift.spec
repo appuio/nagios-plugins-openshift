@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.15.2
+Version: 0.15.3
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -53,6 +53,12 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Fri Nov 23 2018 Michael Hanselmann <hansmi@vshn.ch> 0.15.3-1
+- pod_node_alloc:
+  - Changed decision logic to only complain if either >50% or >3 of pods are on
+    a single node. This way three-replica deployments are considered okay if
+    they have two pods on a single node.
+
 * Thu Nov 15 2018 Michael Hanselmann <hansmi@vshn.ch> 0.15.2-1
 - node_log_heartbeat:
   - Change part of the Elasticsearch filter from "term" to "match" query to
