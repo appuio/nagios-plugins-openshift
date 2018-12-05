@@ -166,7 +166,8 @@ def Check(client, args, timeout):
 
 def get_names(client, kind):
   return client.capture_output([
-    "get", "--no-headers", "--show-kind", "--output=name", kind,
+    "get", "--no-headers", "--show-kind", "--output=name",
+    "--ignore-not-found", kind,
     ]).splitlines()
 
 
@@ -196,8 +197,18 @@ def collect_logs(client):
     collect_logs_inner(client, kind, True)
 
   for kind in [
-      "service",
-      "route",
+      "endpoints",
+      "events",
+      "imagestreamimages",
+      "imagestreams",
+      "imagestreamtags",
+      "limitranges",
+      "quota",
+      "rolebindings",
+      "routes",
+      "secrets",
+      "serviceaccounts",
+      "services",
       ]:
     collect_logs_inner(client, kind, False)
 

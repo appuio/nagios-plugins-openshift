@@ -124,15 +124,12 @@ class PodStatusCount(nagiosplugin.Resource):
 def main():
   parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
   utils.add_verbose_argument(parser)
-  parser.add_argument("--oc", type=str, default=constants.DEFAULT_OC_BINARY,
-                      help="Path to OpenShift client binary")
-  parser.add_argument("--config", type=str, default=None,
-                      help="Configuration file with login credentials")
+  oc_client.add_oc_arguments(parser)
   args = parser.parse_args()
 
   utils.setup_basic_logging(args.verbose)
 
-  client = oc_client.Client(args.oc, args.config)
+  client = oc_client.Client.from_arguments(args)
 
   checks = [
       PodStatusCount(client),

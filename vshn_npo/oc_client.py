@@ -9,6 +9,7 @@ import tempfile
 import time
 import uuid
 
+from . import constants
 from . import retry
 
 
@@ -82,6 +83,10 @@ def TemporaryConfig(cfgfile):
 
 
 class Client:
+  @classmethod
+  def from_arguments(klass, args):
+    return klass(args.oc, args.config)
+
   def __init__(self, binary, cfgfile):
     """Initialize an instance of this class.
 
@@ -145,6 +150,13 @@ class Client:
 
   def capture_json(self, args):
     return json.loads(self.capture_output(args))
+
+
+def add_oc_arguments(parser):
+  parser.add_argument("--oc", type=str, default=constants.DEFAULT_OC_BINARY,
+                      help="Path to OpenShift client binary")
+  parser.add_argument("--config", type=str, default=None,
+                      help="Configuration file with login credentials")
 
 
 def create_project(client, namer):
