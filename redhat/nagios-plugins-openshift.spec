@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.15.3
+Version: 0.15.4
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -53,6 +53,14 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Wed Dec 5 2018 Michael Hanselmann <hansmi@vshn.ch> 0.15.4-1
+- new-app-and-wait:
+  - Collect more logs on completion (regardless of failure).
+
+- pv_avail:
+  - Changed terminology for volumes with undefined storage class from "default
+    class" to "without storage class".
+
 * Fri Nov 23 2018 Michael Hanselmann <hansmi@vshn.ch> 0.15.3-1
 - pod_node_alloc:
   - Changed decision logic to only complain if either >50% or >3 of pods are on

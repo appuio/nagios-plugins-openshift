@@ -1,3 +1,14 @@
+nagios-plugins-openshift (0.15.4) trusty; urgency=medium
+
+  new-app-and-wait:
+  * Collect more logs on completion (regardless of failure).
+
+  pv_avail:
+  * Changed terminology for volumes with undefined storage class from "default
+    class" to "without storage class".
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Wed, 05 Dec 2018 14:01:42 +0100
+
 nagios-plugins-openshift (0.15.3) trusty; urgency=medium
 
   pod_node_alloc:
