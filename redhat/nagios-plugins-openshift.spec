@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.15.4
+Version: 0.16.0
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -20,7 +20,7 @@ Requires: python34-urllib3 >= 1.13
 Requires: python34-dateutil
 
 %package config
-Requires: icinga2, sudo
+Requires: icinga2, nagios-plugins-sudo-config
 Summary: Icinga2 check command definitions for nagios-plugins-openshift
 Group: Applications/System
 
@@ -53,6 +53,10 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Mon Dec 17 2018 Michael Hanselmann <hansmi@vshn.ch> 0.16.0-1
+- Switch from custom "sudo" check command wrapper to
+  "nagios-plugins-sudo-config" package.
+
 * Wed Dec 5 2018 Michael Hanselmann <hansmi@vshn.ch> 0.15.4-1
 - new-app-and-wait:
   - Collect more logs on completion (regardless of failure).
