@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.16.0) trusty; urgency=medium
+
+  * Switch from custom "sudo" check command wrapper to
+    "nagios-plugins-sudo-config" package.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Mon, 17 Dec 2018 14:19:56 +0100
+
 nagios-plugins-openshift (0.15.4) trusty; urgency=medium
 
   new-app-and-wait:
