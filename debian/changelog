@@ -1,3 +1,11 @@
+nagios-plugins-openshift (0.17.0) xenial; urgency=medium
+
+  * check_openshift_object_stats: New plugin to compute object statistics
+    based on "check_openshift_project_pod_phase". The latter will be removed
+    in an upcoming version.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Tue, 29 Jan 2019 17:44:30 +0100
+
 nagios-plugins-openshift (0.16.0) trusty; urgency=medium
 
   * Switch from custom "sudo" check command wrapper to

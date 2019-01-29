@@ -1,0 +1,395 @@
+#!/bin/bash
+
+set -e -u -o pipefail
+
+. /usr/lib/nagios-plugins-openshift/utils
+
+default_reskind=pod,cronjob,job
+
+usage() {
+  echo "Usage: $0 -f <path> [-t <kind>[,<kind>]]"\
+    '[{ -W | -C } <regex>=<number>] [{ -w | -c } <name>=<number>]'
+  echo
+  echo 'Collect statistics on OpenShift objects.'
+  echo
+  echo 'Options:'
+  echo ' -f             Config file path'
+  echo ' -t             Resource kind, separate multiple with comma' \
+    "(default: ${default_reskind})"
+  echo ' -w name=value  Warn if given performance metric is more than given'\
+    'value'
+  echo ' -c name=value  Fail if given performance metric is more than given'\
+    'value'
+  echo ' -W regex=value Warn if performance metrics matching given regular'\
+    'expression are more than given value'
+  echo ' -C regex=value Fail if performance metrics matching given regular'\
+    'expression are more than given value'
+  echo
+  echo 'Examples:'
+  echo '  -c global.pod.count=900'
+  echo '  -W '\''^project\.demo1\.pod\.running\.count=100'\'
+}
+
+tmpdir=$(mktemp -d)
+trap 'rm -rf "$tmpdir"' EXIT
+
+limitfile="${tmpdir}/limits.json"
+objfile="${tmpdir}/objects.json"
+metricsfile="${tmpdir}/metrics.sh"
+
+echo '{}' > "$limitfile"
+
+add_limit() {
+  local kind="$1" key="$2" arg="$3"
+  local name value args
+
+  # TODO: Implement other comparison operators
+  IFS== read -r name value <<<"$arg"
+
+  if [[ -z "$name" || -z "$value" ]]; then
+    usage >&2
+    exit "$state_unknown"
+  fi
+
+  args=(
+    --arg kind "$kind"
+    --arg name "$name"
+    --arg key "$key"
+    --arg value "$value"
+  )
+
+  case "$kind" in
+    plain)
+      args+=( '.plain[$name][$key] = ($value | tonumber)' )
+      ;;
+    regex)
+      # Prepend to array such that more specific expressions can be listed
+      # later in parameters
+      args+=( '.regex[$key] |= [[$name, ($value | tonumber)]] + .' )
+      ;;
+    *)
+      echo "Unknown limit kind \"${kind}\"" >&2
+      return 1
+      ;;
+  esac
+
+  jq --raw-output "${args[@]}" <"$limitfile" >"${limitfile}.tmp" && \
+  mv "${limitfile}.tmp" "$limitfile"
+}
+
+opt_cfgfile=
+opt_reskind="$default_reskind"
+
+while getopts 'hf:t:w:c:W:C:' opt; do
+  case "$opt" in
+    h)
+      usage
+      exit 0
+      ;;
+    f) opt_cfgfile="$OPTARG" ;;
+    t) opt_reskind="$OPTARG" ;;
+    w) add_limit plain warn "$OPTARG" ;;
+    c) add_limit plain crit "$OPTARG" ;;
+    W) add_limit regex warn "$OPTARG" ;;
+    C) add_limit regex crit "$OPTARG" ;;
+    *)
+      usage >&2
+      exit "$state_unknown"
+      ;;
+  esac
+done
+
+shift $((OPTIND - 1))
+
+if [[ "$#" -gt 0 || -z "$opt_cfgfile" || -z "$opt_reskind" ]]; then
+  usage >&2
+  exit "$state_unknown"
+fi
+
+oc_args=(
+  get
+  "$opt_reskind"
+  --all-namespaces
+  --output=json
+  )
+
+# Capture stderr in variable and redirect stdout to file
+# shellcheck disable=SC2069
+if ! msg=$(run_oc "$opt_cfgfile" "${oc_args[@]}" 2>&1 >"$objfile"); then
+  echo "$msg"
+  exit "$state_critical"
+fi
+
+process_data() {
+  jq --raw-output --sort-keys \
+    --argfile limits "$1" \
+    --argjson state_ok "$state_ok" \
+    --argjson state_warning "$state_warning" \
+    --argjson state_critical "$state_critical" \
+    --argjson state_unknown "$state_unknown" '
+def object_namespace:
+  .metadata.namespace // ""
+;
+
+def object_kind:
+  .kind | ascii_downcase // "unknown_kind"
+;
+
+def parse_timestamp:
+  (. // "") |
+  if . and length > 0 then
+    fromdate
+  else
+    null
+  end
+;
+
+def find_limit($name; $type_key):
+  $limits.plain?[$name][$type_key] // (
+    ($limits.regex?[$type_key] // []) |
+    map(
+      .[0] as $re |
+      .[1] as $limit |
+      select($name | test($re; "gs")) |
+      $limit
+    ) |
+    first
+  )
+;
+
+def state_prefix:
+  "[\(
+    if . == $state_ok then
+      "OK"
+    elif . == $state_warning then
+      "WARNING"
+    elif . == $state_critical then
+      "CRITICAL"
+    elif . == $state_unknown then
+      "UNKNOWN"
+    else
+      . | tostring
+    end
+  )]"
+;
+
+reduce .items[] as $obj ({};
+  . as $state |
+  ($obj | object_namespace) as $ns |
+  ($obj.metadata.name) as $obj_name |
+  ($obj | object_kind) as $kind |
+  "project.\($ns)" as $ns_prefix |
+
+  # Compute statistics for object (measurements with equal label will be
+  # summed)
+  [
+    ("global", $ns_prefix) | (
+      . as $prefix |
+      (
+        "",
+        if $kind == "pod" then
+          ($obj.status.phase | ascii_downcase) as $pod_phase |
+          ".\($pod_phase)"
+        else
+          empty
+        end
+      ) | {
+        "label": "\($prefix).\($kind)\(.).count",
+        "value": 1,
+        "min": 0
+      }
+    ),
+
+    if $kind == "cronjob" then
+      ($obj.status?.lastScheduleTime? | parse_timestamp) as $last_schedule_time_ts |
+      if $last_schedule_time_ts then
+        "\($ns_prefix).\($kind).\($obj_name).lastscheduletime" as $prefix |
+        (
+          {
+            "label": "\($prefix).absolute",
+            "value": $last_schedule_time_ts,
+            "uom": "c"
+          },
+          {
+            "label": "\($prefix).elapsed",
+            "value": (now - $last_schedule_time_ts) | floor,
+            "uom": "s",
+            "min": 0
+          }
+        )
+      else
+        empty
+      end
+    elif $kind == "job" then
+      "\($ns_prefix).\($kind).\($obj_name)" as $job_prefix |
+      $obj.status? as $job_status |
+      if $job_status then
+        (
+          $obj.metadata?.ownerReferences? |
+          map(select(.controller and (.kind? | ascii_downcase) == "cronjob")) |
+          first
+        ) as $controller |
+
+        # Pod counts
+        ("active", "failed", "succeeded") | (
+          . as $field |
+          $job_status[$field]? as $value |
+          select($value != null) |
+          (
+            $job_prefix,
+            if $controller then
+              "\($ns_prefix).\($controller.kind | ascii_downcase).\($controller.name).job.\($obj_name)"
+            else
+              empty
+            end
+          ) | {
+            "label": "\(.).\($field)",
+            "value": $value,
+            "min": 0
+          }
+        ),
+
+        # Timing
+        (
+          ($job_status.startTime? | parse_timestamp) as $start_time_ts |
+          ($job_status.completionTime? | parse_timestamp) as $completion_time_ts |
+          (
+            if $start_time_ts then
+              {
+                "label": "\($job_prefix).start",
+                "value": $start_time_ts,
+                "uom": "c"
+              }
+            else
+              empty
+            end,
+            if $completion_time_ts then
+              {
+                "label": "\($job_prefix).completion",
+                "value": $completion_time_ts,
+                "uom": "c"
+              }
+            else
+              empty
+            end,
+            if $start_time_ts and $completion_time_ts then
+              {
+                "label": "\($job_prefix).duration",
+                "value": ($completion_time_ts - $start_time_ts) | floor,
+                "uom": "s",
+                "min": 0
+              }
+            else
+              empty
+            end
+          )
+        )
+      else
+        empty
+      end
+    else
+      empty
+    end
+  ] |
+
+  # Add to previously computed statistics
+  $state + (
+    map(
+      . as $measurement |
+      {
+        "key": $measurement.label,
+        "value": (
+          (
+            if $state | has($measurement.label) then
+              $state[$measurement.label]
+            else
+              {
+                "value": 0,
+                "uom": ($measurement.uom // null),
+                "min": ($measurement.min // null)
+              }
+            end
+          ) as $prev |
+          $prev + {
+            "value": ($prev.value + $measurement.value)
+          }
+        )
+      }
+    ) | from_entries
+  )
+) |
+
+# Convert to flat array, retrieve and evaluate limits
+to_entries | map(
+  {
+    "name": .key,
+    "value": .value.value,
+    "uom": .value.uom,
+    "min": .value.min,
+    "warn": find_limit(.key; "warn"),
+    "crit": find_limit(.key; "crit")
+  } |
+  if .crit != null and .value > .crit then
+    .status = $state_critical |
+    .msg = "\(.name) of \(.value) larger than \(.crit)"
+  elif .warn != null and .value > .warn then
+    .status = $state_warning |
+    .msg = "\(.name) of \(.value) larger than \(.warn)"
+  else
+    .status = $state_ok
+  end
+) |
+
+# Sort by status and name
+sort_by(
+  [(
+    if .status == $state_critical then
+      0
+    elif .status == $state_warning then
+      1
+    elif .status == $state_unknown then
+      2
+    else
+      3
+    end
+  ), .name]
+) as $perfdata |
+
+# Extract messages
+$perfdata | map(
+  select(.msg) | "\(.status | state_prefix) \(.msg)"
+) as $messages |
+
+# Values are sorted by severity, thus the first is also the worst
+$perfdata | first | (.status // $state_unknown) as $exit_status |
+
+# Format metrics
+$perfdata | (
+  sort_by(.name) |
+  map("\u0027\(.name)\u0027=\(.value)\(.uom // "");\(.warn // "");\(.crit // "");\(.min // "")") |
+  join(" ")
+) as $fmtperfdata |
+
+@sh "
+  exit_status=\($exit_status)
+  output=\(
+    (
+      if ($messages | length) == 0 then
+        $exit_status | state_prefix
+      else
+        $messages | join(", ")
+      end
+    ) + " | " + $fmtperfdata
+  )
+"
+'
+}
+
+process_data "$limitfile" < "$objfile" > "$metricsfile"
+
+source "$metricsfile"
+
+echo "$output"
+exit "$exit_status"
+
+# vim: set sw=2 sts=2 et :
