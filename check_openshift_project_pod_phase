@@ -9,6 +9,9 @@ default_namespace=default
 usage() {
   echo "Usage: $0 -f <path> [-w <name>=<number>] [-c <name>=<number>]"
   echo
+  echo "DEPRECATED: Use \"check_openshift_object_stats\" instead. $0 is being"\
+    'removed in a forthcoming version.'
+  echo
   echo 'Check the number of pods and their phases in all namespaces/projects.'
   echo
   echo 'Options:'

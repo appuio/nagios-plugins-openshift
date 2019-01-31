@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.16.0
+Version: 0.17.0
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -53,6 +53,11 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Tue Jan 29 2019 Michael Hanselmann <hansmi@vshn.ch> 0.17.0-1
+- check_openshift_object_stats: New plugin to compute object statistics based
+  on "check_openshift_project_pod_phase". The latter will be removed in an
+  upcoming version.
+
 * Mon Dec 17 2018 Michael Hanselmann <hansmi@vshn.ch> 0.16.0-1
 - Switch from custom "sudo" check command wrapper to
   "nagios-plugins-sudo-config" package.
