@@ -261,58 +261,66 @@ reduce .items[] as $obj ({};
             null
           end
         ) as $controller_prefix |
+        ($job_status.startTime? | parse_timestamp) as $start_time_ts |
+        ($job_status.completionTime? | parse_timestamp) as $completion_time_ts |
+        ($completion_time_ts and
+         ($job_status.failed // 0) == 0 and
+         ($job_status.active // 0) == 0 and
+         ($job_status.succeeded // 0) > 0) as $successful |
 
-        # Pod counts
-        ("active", "failed", "succeeded") | (
-          . as $field |
-          $job_status[$field]? as $value |
-          select($value != null) |
-          (
-            $job_prefix,
-            if $controller then
-              "\($ns_prefix).\($controller.kind | ascii_downcase).\($controller.name).job.\($obj_name)"
-            else
-              empty
-            end
-          ) | {
-            "label": "\(.).\($field)",
-            "value": $value,
-            "min": 0
-          }
-        ),
-
-        # Timing
         (
-          ($job_status.startTime? | parse_timestamp) as $start_time_ts |
-          ($job_status.completionTime? | parse_timestamp) as $completion_time_ts |
-          (
-            if $start_time_ts then
-              $start_time_ts | relative_timestamp |
-              . + {
-                "label": "\($job_prefix).start.\(.label)"
-              }
-            else
-              empty
-            end,
-            if $completion_time_ts then
-              $completion_time_ts | relative_timestamp |
-              . + {
-                "label": "\($job_prefix).completion.\(.label)",
-              }
-            else
-              empty
-            end,
-            if $start_time_ts and $completion_time_ts then
-              {
-                "label": "\($job_prefix).duration",
-                "value": ($completion_time_ts - $start_time_ts) | floor,
-                "uom": "s",
-                "min": 0
-              }
-            else
-              empty
-            end
-          )
+          # Pod counts
+          ("active", "failed", "succeeded") | (
+            . as $field |
+            $job_status[$field]? as $value |
+            select($value != null) | {
+              "label": $field,
+              "value": $value,
+              "min": 0
+            }
+          ),
+
+          # Timing
+          if $start_time_ts then
+            $start_time_ts | relative_timestamp |
+            . + {
+              "label": "start.\(.label)"
+            }
+          else
+            empty
+          end,
+          if $completion_time_ts then
+            $completion_time_ts | relative_timestamp |
+            . + {
+              "label": "completion.\(.label)"
+            }
+          else
+            empty
+          end,
+          if $start_time_ts and $completion_time_ts then
+            {
+              "label": "duration",
+              "value": ($completion_time_ts - $start_time_ts) | floor,
+              "uom": "s",
+              "min": 0
+            }
+          else
+            empty
+          end
+        ) | (
+          . + {
+            "label": "\($job_prefix).\(.label)"
+          },
+          if $controller_prefix and $successful then
+            # Most recent successful completion of a cron job
+            . + {
+              "label": "\($controller_prefix).lastsuccess.\(.label)",
+              "selector": "max",
+              "selector_key": $completion_time_ts
+            }
+          else
+            empty
+          end
         )
       else
         empty
