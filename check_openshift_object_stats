@@ -250,6 +250,13 @@ reduce .items[] as $obj ({};
           map(select(.controller and (.kind? | ascii_downcase) == "cronjob")) |
           first
         ) as $controller |
+        (
+          if $controller then
+            "\($ns_prefix).\($controller.kind | ascii_downcase).\($controller.name)"
+          else
+            null
+          end
+        ) as $controller_prefix |
 
         # Pod counts
         ("active", "failed", "succeeded") | (
