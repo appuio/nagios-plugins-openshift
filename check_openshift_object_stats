@@ -380,8 +380,17 @@ $perfdata | map(
 $perfdata | first | (.status // $state_unknown) as $exit_status |
 
 # Format metrics
-$perfdata | (
-  sort_by(.name) |
+(
+  (
+    ($perfdata | sort_by(.name)) + [
+      # Add number of metrics
+      {
+        "name": "perfdata.count",
+        "value": ($perfdata | length),
+        "min": 0
+      }
+    ]
+  ) |
   map("\u0027\(.name)\u0027=\(.value)\(.uom // "");\(.warn // "");\(.crit // "");\(.min // "")") |
   join(if verbose then "\n" else " " end)
 ) as $fmtperfdata |
