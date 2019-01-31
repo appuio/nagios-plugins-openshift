@@ -225,7 +225,7 @@ reduce .items[] as $obj ({};
       $obj.status? as $job_status |
       if $job_status then
         (
-          $obj.metadata?.ownerReferences? |
+          ($obj.metadata?.ownerReferences? // []) |
           map(select(.controller and (.kind? | ascii_downcase) == "cronjob")) |
           first
         ) as $controller |
