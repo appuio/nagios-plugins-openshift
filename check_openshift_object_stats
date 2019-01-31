@@ -189,6 +189,22 @@ def state_prefix:
   )]"
 ;
 
+def relative_timestamp:
+  (
+    {
+      "label": "absolute",
+      "value": .,
+      "uom": "c"
+    },
+    {
+      "label": "elapsed",
+      "value": (now - .) | floor,
+      "uom": "s",
+      "min": 0
+    }
+  )
+;
+
 reduce .items[] as $obj ({};
   . as $state |
   ($obj | object_namespace) as $ns |
@@ -219,20 +235,9 @@ reduce .items[] as $obj ({};
     if $kind == "cronjob" then
       ($obj.status?.lastScheduleTime? | parse_timestamp) as $last_schedule_time_ts |
       if $last_schedule_time_ts then
-        "\($ns_prefix).\($kind).\($obj_name).lastscheduletime" as $prefix |
-        (
-          {
-            "label": "\($prefix).absolute",
-            "value": $last_schedule_time_ts,
-            "uom": "c"
-          },
-          {
-            "label": "\($prefix).elapsed",
-            "value": (now - $last_schedule_time_ts) | floor,
-            "uom": "s",
-            "min": 0
-          }
-        )
+        $last_schedule_time_ts |
+        relative_timestamp |
+        .label |= "\($ns_prefix).\($kind).\($obj_name).lastscheduletime.\(.)"
       else
         empty
       end
