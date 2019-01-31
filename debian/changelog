@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.17.1) xenial; urgency=medium
+
+  * check_openshift_object_stats: Support additional "-n" parameter to specify
+    namespace. By default objects from all namespaces are retrieved.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Thu, 31 Jan 2019 13:46:58 +0100
+
 nagios-plugins-openshift (0.17.0) xenial; urgency=medium
 
   * check_openshift_object_stats: New plugin to compute object statistics

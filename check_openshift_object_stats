@@ -7,13 +7,14 @@ set -e -u -o pipefail
 default_reskind=pod,cronjob,job
 
 usage() {
-  echo "Usage: $0 -f <path> [-t <kind>[,<kind>]]"\
+  echo "Usage: $0 -f <path> [-n <ns>] [-t <kind>[,<kind>]]"\
     '[{ -W | -C } <regex>=<number>] [{ -w | -c } <name>=<number>]'
   echo
   echo 'Collect statistics on OpenShift objects.'
   echo
   echo 'Options:'
   echo ' -f             Config file path'
+  echo ' -n             Namespace (defaults to all namespaces)'
   echo ' -t             Resource kind, separate multiple with comma' \
     "(default: ${default_reskind})"
   echo ' -w name=value  Warn if given performance metric is more than given'\
@@ -78,15 +79,17 @@ add_limit() {
 }
 
 opt_cfgfile=
+opt_namespace=
 opt_reskind="$default_reskind"
 
-while getopts 'hf:t:w:c:W:C:' opt; do
+while getopts 'hf:n:t:w:c:W:C:' opt; do
   case "$opt" in
     h)
       usage
       exit 0
       ;;
     f) opt_cfgfile="$OPTARG" ;;
+    n) opt_namespace="$OPTARG" ;;
     t) opt_reskind="$OPTARG" ;;
     w) add_limit plain warn "$OPTARG" ;;
     c) add_limit plain crit "$OPTARG" ;;
@@ -109,9 +112,14 @@ fi
 oc_args=(
   get
   "$opt_reskind"
-  --all-namespaces
   --output=json
   )
+
+if [[ -z "$opt_namespace" ]]; then
+  oc_args+=( --all-namespaces )
+else
+  oc_args+=( -n "$opt_namespace" )
+fi
 
 # Capture stderr in variable and redirect stdout to file
 # shellcheck disable=SC2069
@@ -225,7 +233,7 @@ reduce .items[] as $obj ({};
       $obj.status? as $job_status |
       if $job_status then
         (
-          $obj.metadata?.ownerReferences? |
+          ($obj.metadata?.ownerReferences? // []) |
           map(select(.controller and (.kind? | ascii_downcase) == "cronjob")) |
           first
         ) as $controller |
