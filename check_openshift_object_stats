@@ -276,19 +276,17 @@ reduce .items[] as $obj ({};
           ($job_status.completionTime? | parse_timestamp) as $completion_time_ts |
           (
             if $start_time_ts then
-              {
-                "label": "\($job_prefix).start",
-                "value": $start_time_ts,
-                "uom": "c"
+              $start_time_ts | relative_timestamp |
+              . + {
+                "label": "\($job_prefix).start.\(.label)"
               }
             else
               empty
             end,
             if $completion_time_ts then
-              {
-                "label": "\($job_prefix).completion",
-                "value": $completion_time_ts,
-                "uom": "c"
+              $completion_time_ts | relative_timestamp |
+              . + {
+                "label": "\($job_prefix).completion.\(.label)",
               }
             else
               empty
