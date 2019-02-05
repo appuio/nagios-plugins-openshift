@@ -1,3 +1,11 @@
+nagios-plugins-openshift (0.17.2) xenial; urgency=medium
+
+  check_openshift_object_stats:
+  * Add verbose mode for easier debugging.
+  * Compute more statistics for cron jobs.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Tue, 05 Feb 2019 17:01:08 +0100
+
 nagios-plugins-openshift (0.17.1) xenial; urgency=medium
 
   * check_openshift_object_stats: Support additional "-n" parameter to specify
