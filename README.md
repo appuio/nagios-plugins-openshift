@@ -69,6 +69,11 @@ timestamped log message to logging component.
 Check whether node resources (CPU, memory) are within given limits.
 
 
+### `check_openshift_object_stats`
+
+Compute statistics on a number of cluster objects and apply given limits.
+
+
 ### `check_openshift_pod_count`
 
 Check whether number of running pods for a given namespace and selector is
