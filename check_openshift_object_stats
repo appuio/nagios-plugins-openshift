@@ -238,6 +238,15 @@ reduce .items[] as $obj ({};
     ),
 
     if $kind == "cronjob" then
+      $obj.spec? as $cronjob_spec |
+      if $cronjob_spec then
+        {
+          "label": "\($obj_prefix).suspend",
+          "value": (if $cronjob_spec.suspend? then 1 else 0 end)
+        }
+      else
+        empty
+      end,
       ($obj.status?.lastScheduleTime? | parse_timestamp) as $last_schedule_time_ts |
       if $last_schedule_time_ts then
         $last_schedule_time_ts |
