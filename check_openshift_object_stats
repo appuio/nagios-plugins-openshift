@@ -13,6 +13,7 @@ usage() {
   echo 'Collect statistics on OpenShift objects.'
   echo
   echo 'Options:'
+  echo ' -v             Verbose output for debugging'
   echo ' -f             Config file path'
   echo ' -n             Namespace (defaults to all namespaces)'
   echo ' -t             Resource kind, separate multiple with comma' \
@@ -78,16 +79,18 @@ add_limit() {
   mv "${limitfile}.tmp" "$limitfile"
 }
 
+opt_verbose=
 opt_cfgfile=
 opt_namespace=
 opt_reskind="$default_reskind"
 
-while getopts 'hf:n:t:w:c:W:C:' opt; do
+while getopts 'hvf:n:t:w:c:W:C:' opt; do
   case "$opt" in
     h)
       usage
       exit 0
       ;;
+    v) opt_verbose=yes ;;
     f) opt_cfgfile="$OPTARG" ;;
     n) opt_namespace="$OPTARG" ;;
     t) opt_reskind="$OPTARG" ;;
@@ -130,11 +133,16 @@ fi
 
 process_data() {
   jq --raw-output --sort-keys \
+    --arg opt_verbose "$opt_verbose" \
     --argfile limits "$1" \
     --argjson state_ok "$state_ok" \
     --argjson state_warning "$state_warning" \
     --argjson state_critical "$state_critical" \
     --argjson state_unknown "$state_unknown" '
+def verbose:
+  ($opt_verbose | length) > 0
+;
+
 def object_namespace:
   .metadata.namespace // ""
 ;
@@ -375,7 +383,7 @@ $perfdata | first | (.status // $state_unknown) as $exit_status |
 $perfdata | (
   sort_by(.name) |
   map("\u0027\(.name)\u0027=\(.value)\(.uom // "");\(.warn // "");\(.crit // "");\(.min // "")") |
-  join(" ")
+  join(if verbose then "\n" else " " end)
 ) as $fmtperfdata |
 
 @sh "
