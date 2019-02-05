@@ -215,6 +215,7 @@ reduce .items[] as $obj ({};
   ($obj.metadata.name) as $obj_name |
   ($obj | object_kind) as $kind |
   "project.\($ns)" as $ns_prefix |
+  "\($ns_prefix).\($kind).\($obj_name)" as $obj_prefix |
 
   # Compute statistics for object (measurements with equal label will be
   # summed)
@@ -241,12 +242,20 @@ reduce .items[] as $obj ({};
       if $last_schedule_time_ts then
         $last_schedule_time_ts |
         relative_timestamp |
-        .label |= "\($ns_prefix).\($kind).\($obj_name).lastscheduletime.\(.)"
+        .label |= "\($obj_prefix).lastscheduletime.\(.)"
       else
         empty
-      end
+      end,
+      (
+        # Dummy metric to detect cron jobs without jobs
+        0 | relative_timestamp |
+        . + {
+          "label": "\($obj_prefix).lastsuccess.completion.\(.label)",
+          "selector": "max",
+          "selector_key": 0
+        }
+      )
     elif $kind == "job" then
-      "\($ns_prefix).\($kind).\($obj_name)" as $job_prefix |
       $obj.status? as $job_status |
       if $job_status then
         (
@@ -309,7 +318,7 @@ reduce .items[] as $obj ({};
           end
         ) | (
           . + {
-            "label": "\($job_prefix).\(.label)"
+            "label": "\($obj_prefix).\(.label)"
           },
           if $controller_prefix and $successful then
             # Most recent successful completion of a cron job
