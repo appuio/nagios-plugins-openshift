@@ -205,6 +205,10 @@ def relative_timestamp:
   )
 ;
 
+def selector_key:
+  .selector_key // error("Measurement \(.) is missing selector key")
+;
+
 reduce .items[] as $obj ({};
   . as $state |
   ($obj | object_namespace) as $ns |
@@ -325,20 +329,32 @@ reduce .items[] as $obj ({};
       {
         "key": $measurement.label,
         "value": (
-          (
-            if $state | has($measurement.label) then
-              $state[$measurement.label]
-            else
-              {
-                "value": 0,
-                "uom": ($measurement.uom // null),
-                "min": ($measurement.min // null)
-              }
-            end
-          ) as $prev |
-          $prev + {
-            "value": ($prev.value + $measurement.value)
-          }
+          ($state[$measurement.label] // null) as $prev |
+          if $prev then
+            $prev + {
+              "value": (
+                $measurement.selector? as $sel |
+                [$prev, $measurement] |
+                if $sel == "min" then
+                  min_by(selector_key).value
+                elif $sel == "max" then
+                  max_by(selector_key).value
+                else
+                  map(.value) | add
+                end
+              )
+            }
+          else
+            {
+              "value": $measurement.value,
+              "uom": ($measurement.uom // null),
+              "min": ($measurement.min // null),
+
+              # How to combine multiple values
+              "selector": ($measurement.selector // "add"),
+              "selector_key": ($measurement.selector_key // null)
+            }
+          end
         )
       }
     ) | from_entries
