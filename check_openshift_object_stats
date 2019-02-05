@@ -13,6 +13,7 @@ usage() {
   echo 'Collect statistics on OpenShift objects.'
   echo
   echo 'Options:'
+  echo ' -v             Verbose output for debugging'
   echo ' -f             Config file path'
   echo ' -n             Namespace (defaults to all namespaces)'
   echo ' -t             Resource kind, separate multiple with comma' \
@@ -78,16 +79,18 @@ add_limit() {
   mv "${limitfile}.tmp" "$limitfile"
 }
 
+opt_verbose=
 opt_cfgfile=
 opt_namespace=
 opt_reskind="$default_reskind"
 
-while getopts 'hf:n:t:w:c:W:C:' opt; do
+while getopts 'hvf:n:t:w:c:W:C:' opt; do
   case "$opt" in
     h)
       usage
       exit 0
       ;;
+    v) opt_verbose=yes ;;
     f) opt_cfgfile="$OPTARG" ;;
     n) opt_namespace="$OPTARG" ;;
     t) opt_reskind="$OPTARG" ;;
@@ -130,11 +133,16 @@ fi
 
 process_data() {
   jq --raw-output --sort-keys \
+    --arg opt_verbose "$opt_verbose" \
     --argfile limits "$1" \
     --argjson state_ok "$state_ok" \
     --argjson state_warning "$state_warning" \
     --argjson state_critical "$state_critical" \
     --argjson state_unknown "$state_unknown" '
+def verbose:
+  ($opt_verbose | length) > 0
+;
+
 def object_namespace:
   .metadata.namespace // ""
 ;
@@ -181,12 +189,33 @@ def state_prefix:
   )]"
 ;
 
+def relative_timestamp:
+  (
+    {
+      "label": "absolute",
+      "value": .,
+      "uom": "c"
+    },
+    {
+      "label": "elapsed",
+      "value": (now - .) | floor,
+      "uom": "s",
+      "min": 0
+    }
+  )
+;
+
+def selector_key:
+  .selector_key // error("Measurement \(.) is missing selector key")
+;
+
 reduce .items[] as $obj ({};
   . as $state |
   ($obj | object_namespace) as $ns |
   ($obj.metadata.name) as $obj_name |
   ($obj | object_kind) as $kind |
   "project.\($ns)" as $ns_prefix |
+  "\($ns_prefix).\($kind).\($obj_name)" as $obj_prefix |
 
   # Compute statistics for object (measurements with equal label will be
   # summed)
@@ -209,27 +238,33 @@ reduce .items[] as $obj ({};
     ),
 
     if $kind == "cronjob" then
-      ($obj.status?.lastScheduleTime? | parse_timestamp) as $last_schedule_time_ts |
-      if $last_schedule_time_ts then
-        "\($ns_prefix).\($kind).\($obj_name).lastscheduletime" as $prefix |
-        (
-          {
-            "label": "\($prefix).absolute",
-            "value": $last_schedule_time_ts,
-            "uom": "c"
-          },
-          {
-            "label": "\($prefix).elapsed",
-            "value": (now - $last_schedule_time_ts) | floor,
-            "uom": "s",
-            "min": 0
-          }
-        )
+      $obj.spec? as $cronjob_spec |
+      if $cronjob_spec then
+        {
+          "label": "\($obj_prefix).suspend",
+          "value": (if $cronjob_spec.suspend? then 1 else 0 end)
+        }
       else
         empty
-      end
+      end,
+      ($obj.status?.lastScheduleTime? | parse_timestamp) as $last_schedule_time_ts |
+      if $last_schedule_time_ts then
+        $last_schedule_time_ts |
+        relative_timestamp |
+        .label |= "\($obj_prefix).lastscheduletime.\(.)"
+      else
+        empty
+      end,
+      (
+        # Dummy metric to detect cron jobs without jobs
+        0 | relative_timestamp |
+        . + {
+          "label": "\($obj_prefix).lastsuccess.completion.\(.label)",
+          "selector": "max",
+          "selector_key": 0
+        }
+      )
     elif $kind == "job" then
-      "\($ns_prefix).\($kind).\($obj_name)" as $job_prefix |
       $obj.status? as $job_status |
       if $job_status then
         (
@@ -237,60 +272,73 @@ reduce .items[] as $obj ({};
           map(select(.controller and (.kind? | ascii_downcase) == "cronjob")) |
           first
         ) as $controller |
-
-        # Pod counts
-        ("active", "failed", "succeeded") | (
-          . as $field |
-          $job_status[$field]? as $value |
-          select($value != null) |
-          (
-            $job_prefix,
-            if $controller then
-              "\($ns_prefix).\($controller.kind | ascii_downcase).\($controller.name).job.\($obj_name)"
-            else
-              empty
-            end
-          ) | {
-            "label": "\(.).\($field)",
-            "value": $value,
-            "min": 0
-          }
-        ),
-
-        # Timing
         (
-          ($job_status.startTime? | parse_timestamp) as $start_time_ts |
-          ($job_status.completionTime? | parse_timestamp) as $completion_time_ts |
-          (
-            if $start_time_ts then
-              {
-                "label": "\($job_prefix).start",
-                "value": $start_time_ts,
-                "uom": "c"
-              }
-            else
-              empty
-            end,
-            if $completion_time_ts then
-              {
-                "label": "\($job_prefix).completion",
-                "value": $completion_time_ts,
-                "uom": "c"
-              }
-            else
-              empty
-            end,
-            if $start_time_ts and $completion_time_ts then
-              {
-                "label": "\($job_prefix).duration",
-                "value": ($completion_time_ts - $start_time_ts) | floor,
-                "uom": "s",
-                "min": 0
-              }
-            else
-              empty
-            end
-          )
+          if $controller then
+            "\($ns_prefix).\($controller.kind | ascii_downcase).\($controller.name)"
+          else
+            null
+          end
+        ) as $controller_prefix |
+        ($job_status.startTime? | parse_timestamp) as $start_time_ts |
+        ($job_status.completionTime? | parse_timestamp) as $completion_time_ts |
+        ($completion_time_ts and
+         ($job_status.failed // 0) == 0 and
+         ($job_status.active // 0) == 0 and
+         ($job_status.succeeded // 0) > 0) as $successful |
+
+        (
+          # Pod counts
+          ("active", "failed", "succeeded") | (
+            . as $field |
+            $job_status[$field]? as $value |
+            select($value != null) | {
+              "label": $field,
+              "value": $value,
+              "min": 0
+            }
+          ),
+
+          # Timing
+          if $start_time_ts then
+            $start_time_ts | relative_timestamp |
+            . + {
+              "label": "start.\(.label)"
+            }
+          else
+            empty
+          end,
+          if $completion_time_ts then
+            $completion_time_ts | relative_timestamp |
+            . + {
+              "label": "completion.\(.label)"
+            }
+          else
+            empty
+          end,
+          if $start_time_ts and $completion_time_ts then
+            {
+              "label": "duration",
+              "value": ($completion_time_ts - $start_time_ts) | floor,
+              "uom": "s",
+              "min": 0
+            }
+          else
+            empty
+          end
+        ) | (
+          . + {
+            "label": "\($obj_prefix).\(.label)"
+          },
+          if $controller_prefix and $successful then
+            # Most recent successful completion of a cron job
+            . + {
+              "label": "\($controller_prefix).lastsuccess.\(.label)",
+              "selector": "max",
+              "selector_key": $completion_time_ts
+            }
+          else
+            empty
+          end
         )
       else
         empty
@@ -307,20 +355,32 @@ reduce .items[] as $obj ({};
       {
         "key": $measurement.label,
         "value": (
-          (
-            if $state | has($measurement.label) then
-              $state[$measurement.label]
-            else
-              {
-                "value": 0,
-                "uom": ($measurement.uom // null),
-                "min": ($measurement.min // null)
-              }
-            end
-          ) as $prev |
-          $prev + {
-            "value": ($prev.value + $measurement.value)
-          }
+          ($state[$measurement.label] // null) as $prev |
+          if $prev then
+            $prev + {
+              "value": (
+                $measurement.selector? as $sel |
+                [$prev, $measurement] |
+                if $sel == "min" then
+                  min_by(selector_key).value
+                elif $sel == "max" then
+                  max_by(selector_key).value
+                else
+                  map(.value) | add
+                end
+              )
+            }
+          else
+            {
+              "value": $measurement.value,
+              "uom": ($measurement.uom // null),
+              "min": ($measurement.min // null),
+
+              # How to combine multiple values
+              "selector": ($measurement.selector // "add"),
+              "selector_key": ($measurement.selector_key // null)
+            }
+          end
         )
       }
     ) | from_entries
@@ -372,10 +432,19 @@ $perfdata | map(
 $perfdata | first | (.status // $state_unknown) as $exit_status |
 
 # Format metrics
-$perfdata | (
-  sort_by(.name) |
+(
+  (
+    ($perfdata | sort_by(.name)) + [
+      # Add number of metrics
+      {
+        "name": "perfdata.count",
+        "value": ($perfdata | length),
+        "min": 0
+      }
+    ]
+  ) |
   map("\u0027\(.name)\u0027=\(.value)\(.uom // "");\(.warn // "");\(.crit // "");\(.min // "")") |
-  join(" ")
+  join(if verbose then "\n" else " " end)
 ) as $fmtperfdata |
 
 @sh "
