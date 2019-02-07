@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.17.3) xenial; urgency=medium
+
+  check_openshift_object_stats:
+  * Output only metrics with defined limits or an unhealthy status.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Wed, 06 Feb 2019 12:49:18 +0100
+
 nagios-plugins-openshift (0.17.2) xenial; urgency=medium
 
   check_openshift_object_stats:

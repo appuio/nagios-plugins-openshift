@@ -405,10 +405,20 @@ to_entries | map(
     .msg = "\(.name) of \(.value) larger than \(.warn)"
   else
     .status = $state_ok
-  end
-) |
+  end |
+  .output = verbose or (
+    (
+      .status == $state_ok and
+      .warn == null and
+      .crit == null and
+      .msg == null
+    ) | not
+    )
+) as $perfdata_all |
 
-# Sort by status and name
+# Sort metrics for output by status and name
+$perfdata_all |
+map(select(.output)) |
 sort_by(
   [(
     if .status == $state_critical then
@@ -435,12 +445,25 @@ $perfdata | first | (.status // $state_unknown) as $exit_status |
 (
   (
     ($perfdata | sort_by(.name)) + [
-      # Add number of metrics
-      {
-        "name": "perfdata.count",
-        "value": ($perfdata | length),
-        "min": 0
-      }
+      (
+        ($perfdata | length) as $perfdata_count |
+        ($perfdata_all | length) as $perfdata_all_count |
+
+        # Add number of metrics
+        {
+          "name": "perfdata.all.count",
+          "value": $perfdata_all_count
+        },
+        {
+          "name": "perfdata.selected.count",
+          "value": $perfdata_count
+        },
+        {
+          "name": "perfdata.filtered.count",
+          "value": ($perfdata_all_count - $perfdata_count)
+        }
+      ) |
+      .min = 0
     ]
   ) |
   map("\u0027\(.name)\u0027=\(.value)\(.uom // "");\(.warn // "");\(.crit // "");\(.min // "")") |
