@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.17.4) xenial; urgency=medium
+
+  check_openshift_object_stats:
+  * Return "OK" status when there are no metrics.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Thu, 21 Mar 2019 18:02:00 +0100
+
 nagios-plugins-openshift (0.17.3) xenial; urgency=medium
 
   check_openshift_object_stats:
