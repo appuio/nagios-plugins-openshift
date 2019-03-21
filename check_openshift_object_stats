@@ -439,7 +439,7 @@ $perfdata | map(
 ) as $messages |
 
 # Values are sorted by severity, thus the first is also the worst
-$perfdata | first | (.status // $state_unknown) as $exit_status |
+(($perfdata | first | .status) // $state_ok) as $exit_status |
 
 # Format metrics
 (

@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.17.3
+Version: 0.17.4
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -53,6 +53,10 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Thu Mar 21 2019 Michael Hanselmann <hansmi@vshn.ch> 0.17.4-1
+- check_openshift_object_stats:
+  - Return "OK" status when there are no metrics.
+
 * Wed Feb 6 2019 Michael Hanselmann <hansmi@vshn.ch> 0.17.3-1
 - check_openshift_object_stats:
   - Output only metrics with defined limits or an unhealthy status.
