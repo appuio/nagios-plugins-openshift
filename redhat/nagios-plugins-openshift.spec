@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.17.4
+Version: 0.17.5
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -53,6 +53,12 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Fri Mar 29 2019 Michael Hanselmann <hansmi@vshn.ch> 0.17.5-1
+- check_openshift_es_stats:
+  - Use Elasticsearch instance name as metric suffix.
+  - Strip "logging-es-data-master-" and "logging-es-" prefixes from instance
+    name.
+
 * Thu Mar 21 2019 Michael Hanselmann <hansmi@vshn.ch> 0.17.4-1
 - check_openshift_object_stats:
   - Return "OK" status when there are no metrics.

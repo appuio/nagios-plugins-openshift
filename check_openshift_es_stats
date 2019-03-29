@@ -80,10 +80,12 @@ class StatsQuery(nagiosplugin.Resource):
       # In a cluster outside OpenShift there could be more than one
       # Elasticsearch instance per host, but in OpenShift every container has
       # its own name.
-      suffix = node["host"]
+      suffix = node["name"]
 
-      if suffix.startswith(self._strip_hostname_prefix):
-        suffix = suffix[len(self._strip_hostname_prefix):]
+      for i in self._strip_hostname_prefix:
+        if suffix.startswith(i):
+          suffix = suffix[len(i):]
+          break
 
       for i in itertools.chain(_FsStats(suffix, node["fs"]),
                                _ProcessStats(suffix, node["process"]),
@@ -97,7 +99,7 @@ def main():
   utils.add_verbose_argument(parser)
   utils.add_token_arguments(parser)
   parser.add_argument("--strip-hostname-prefix", metavar="PREFIX",
-                      default="logging-es-",
+                      action="append",
                       help="Strip given prefix from node names")
   parser.add_argument("--fs-used-warn", metavar="RANGE",
                       help="Warn if consumed disk space is above given percentage")
@@ -116,6 +118,13 @@ def main():
                       help="API endpoint")
 
   args = parser.parse_args()
+
+  # Workaround for https://bugs.python.org/issue16399
+  if not args.strip_hostname_prefix:
+    args.strip_hostname_prefix = [
+      "logging-es-data-master-",
+      "logging-es-",
+    ]
 
   utils.setup_basic_logging(args.verbose)
 
