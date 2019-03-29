@@ -1,3 +1,12 @@
+nagios-plugins-openshift (0.17.5) xenial; urgency=medium
+
+  check_openshift_es_stats:
+  * Use Elasticsearch instance name as metric suffix.
+  * Strip "logging-es-data-master-" and "logging-es-" prefixes from instance
+    name.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Fri, 29 Mar 2019 12:25:56 +0100
+
 nagios-plugins-openshift (0.17.4) xenial; urgency=medium
 
   check_openshift_object_stats:
