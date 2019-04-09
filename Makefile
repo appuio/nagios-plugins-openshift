@@ -5,7 +5,12 @@ all:	#nothing to build
 
 install:
 	mkdir -p $(DESTDIR)/$(LIBDIR)/nagios-plugins-openshift
-	cp new-app-and-wait "$(DESTDIR)/$(LIBDIR)/nagios-plugins-openshift/new-app-and-wait"
+	for i in new-app-and-wait; do \
+		sed -r \
+			-e '1 s|^(#!/usr/bin/python)3$$|\13.4|' \
+			< "$$i" \
+			> "$(DESTDIR)/$(LIBDIR)/nagios-plugins-openshift/$$(basename "$$i")"; \
+	done
 	sed -r \
 		-e 's#\b(OPENSHIFT_CLIENT_BINARY=)/usr/bin/oc\b#\1$(LIBDIR)/openshift-origin-client-tools/oc#' \
 		< utils \
@@ -18,7 +23,9 @@ install:
 	mkdir -p $(DESTDIR)/$(LIBDIR)/nagios/plugins
 	set -e && for i in check_*; do \
 		echo "Patching $$i ..." >&2 && \
-		sed -re 's#(^\. )/usr/lib(/nagios-plugins-openshift/utils)$$#\1$(LIBDIR)\2#g' \
+		sed -r \
+			-e '1 s|^(#!/usr/bin/python)3$$|\13.4|' \
+			-e 's#(^\. )/usr/lib(/nagios-plugins-openshift/utils)$$#\1$(LIBDIR)\2#g' \
 			< "$$i" \
 			> "$(DESTDIR)/$(LIBDIR)/nagios/plugins/$$(basename "$$i")"; \
 	done
