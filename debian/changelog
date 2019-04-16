@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.17.6) xenial; urgency=medium
+
+  check_openshift_es_stats:
+  * Gather cluster-wide statistics and allow application of limits.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Tue, 16 Apr 2019 11:17:15 +0200
+
 nagios-plugins-openshift (0.17.5) xenial; urgency=medium
 
   check_openshift_es_stats:

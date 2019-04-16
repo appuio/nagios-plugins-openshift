@@ -13,7 +13,59 @@ def _bytes_to_mb(value):
   return int(round(value / (1024.0 * 1024), 0))
 
 
-def _FsStats(suffix, data):
+class _CapacityStats:
+  def __init__(self, name, uom="MB"):
+    self._name = name
+    self._uom = uom
+    self._node_size = []
+    self._node_used = []
+    self._node_used_percent = []
+
+  def add(self, name_suffix, size, used):
+    usedperc = int(100.0 * used / size)
+
+    self._node_size.append(size)
+    self._node_used.append(used)
+    self._node_used_percent.append(usedperc)
+
+    yield nagiosplugin.Metric("{}-{}".format(self._name, name_suffix), used,
+                              uom=self._uom, min=0, max=size,
+                              context=self._name)
+
+    yield nagiosplugin.Metric("{}-percent-{}".format(self._name, name_suffix),
+                              usedperc,
+                              uom="%", min=0, max=100,
+                              context="{}-percent".format(self._name))
+
+  def stats(self):
+    global_size = sum(self._node_size)
+    global_used = sum(self._node_used)
+    global_used_percent = int(100.0 * global_used / global_size)
+
+    yield nagiosplugin.Metric("global-{}".format(self._name), global_used,
+                              uom=self._uom, min=0, max=global_size,
+                              context="global-{}".format(self._name))
+    yield nagiosplugin.Metric("node-{}-min".format(self._name), min(self._node_used),
+                              uom=self._uom, min=0,
+                              context="default")
+    yield nagiosplugin.Metric("node-{}-max".format(self._name), max(self._node_used),
+                              uom=self._uom, min=0,
+                              context="default")
+
+    yield nagiosplugin.Metric("global-{}-percent".format(self._name), global_used_percent,
+                              uom="%", min=0, max=100,
+                              context="global-{}-percent".format(self._name))
+    yield nagiosplugin.Metric("node-{}-percent-min".format(self._name),
+                              min(self._node_used_percent),
+                              uom="%", min=0,
+                              context="default")
+    yield nagiosplugin.Metric("node-{}-percent-max".format(self._name),
+                              max(self._node_used_percent),
+                              uom="%", min=0,
+                              context="default")
+
+
+def _FsStats(stats, suffix, data):
   # TODO: Monitor per-path space, not only globally
   allpaths = data["total"]
 
@@ -21,15 +73,7 @@ def _FsStats(suffix, data):
   totalmb = _bytes_to_mb(allpaths["total_in_bytes"])
   usedmb = totalmb - availmb
 
-  yield nagiosplugin.Metric("fs-used-{}".format(suffix), usedmb,
-                            uom="MB", min=0, max=totalmb,
-                            context="fs-used")
-
-  usedperc = int(100.0 * usedmb / totalmb)
-
-  yield nagiosplugin.Metric("fs-used-percent-{}".format(suffix), usedperc,
-                            uom="%", min=0, max=100,
-                            context="fs-used-percent")
+  yield from stats.add(suffix, totalmb, usedmb)
 
 
 def _ProcessStats(suffix, data):
@@ -41,21 +85,13 @@ def _ProcessStats(suffix, data):
                             context="process-cpu-percent")
 
 
-def _JvmStats(suffix, data):
+def _JvmStats(stats, suffix, data):
   memdata = data["mem"]
 
   heap_max_mb = _bytes_to_mb(memdata["heap_max_in_bytes"])
   heap_used_mb = _bytes_to_mb(memdata["heap_used_in_bytes"])
 
-  yield nagiosplugin.Metric("jvm-heap-used-{}".format(suffix), heap_used_mb,
-                            uom="MB", min=0, max=heap_max_mb,
-                            context="jvm-heap-used")
-
-  yield nagiosplugin.Metric("jvm-heap-used-percent-{}".format(suffix),
-                            memdata["heap_used_percent"],
-                            uom="%", min=0, max=100,
-                            context="jvm-heap-used-percent")
-
+  yield from stats.add(suffix, heap_max_mb, heap_used_mb)
 
 class StatsQuery(nagiosplugin.Resource):
   def __init__(self, endpoint, token, strip_hostname_prefix):
@@ -74,6 +110,9 @@ class StatsQuery(nagiosplugin.Resource):
 
     data = response.json()
 
+    fs_used_stats = _CapacityStats("fs-used")
+    jvm_heap_used_stats = _CapacityStats("jvm-heap-used")
+
     # Data structure documentation:
     # https://www.elastic.co/guide/en/elasticsearch/reference/2.4/cluster-nodes-stats.html#fs-info
     for node in data["nodes"].values():
@@ -87,10 +126,12 @@ class StatsQuery(nagiosplugin.Resource):
           suffix = suffix[len(i):]
           break
 
-      for i in itertools.chain(_FsStats(suffix, node["fs"]),
-                               _ProcessStats(suffix, node["process"]),
-                               _JvmStats(suffix, node["jvm"])):
-        yield i
+      yield from _FsStats(fs_used_stats, suffix, node["fs"])
+      yield from _ProcessStats(suffix, node["process"])
+      yield from _JvmStats(jvm_heap_used_stats, suffix, node["jvm"])
+
+    yield from fs_used_stats.stats()
+    yield from jvm_heap_used_stats.stats()
 
 
 @nagiosplugin.guarded
@@ -102,17 +143,25 @@ def main():
                       action="append",
                       help="Strip given prefix from node names")
   parser.add_argument("--fs-used-warn", metavar="RANGE",
-                      help="Warn if consumed disk space is above given percentage")
+                      help="Warn if consumed disk space on any node is above given percentage")
   parser.add_argument("--fs-used-critical", metavar="RANGE",
-                      help="Critical if consumed disk space is above given percentage")
+                      help="Critical if consumed disk space on any node is above given percentage")
+  parser.add_argument("--global-fs-used-warn", metavar="RANGE",
+                      help="Warn if consumed disk space across all nodes is above given percentage")
+  parser.add_argument("--global-fs-used-critical", metavar="RANGE",
+                      help="Critical if consumed disk space across all nodes is above given percentage")
   parser.add_argument("--cpu-usage-warn", metavar="RANGE",
-                      help="Warn if CPU usage is above given percentage")
+                      help="Warn if CPU usage on any node is above given percentage")
   parser.add_argument("--cpu-usage-critical", metavar="RANGE",
-                      help="Critical if CPU usage is above given percentage")
+                      help="Critical if CPU usage on any node is above given percentage")
   parser.add_argument("--jvm-heap-used-warn", metavar="RANGE",
-                      help="Warn if JVM heap usage is above given percentage")
+                      help="Warn if JVM heap usage on any node is above given percentage")
   parser.add_argument("--jvm-heap-used-critical", metavar="RANGE",
-                      help="Critical if JVM heap usage is above given percentage")
+                      help="Critical if JVM heap usage on any node is above given percentage")
+  parser.add_argument("--global-jvm-heap-used-warn", metavar="RANGE",
+                      help="Warn if JVM heap usage across all nodes is above given percentage")
+  parser.add_argument("--global-jvm-heap-used-critical", metavar="RANGE",
+                      help="Critical if JVM heap usage across all nodes is above given percentage")
 
   parser.add_argument("--endpoint", required=True, metavar="URL",
                       help="API endpoint")
@@ -132,6 +181,14 @@ def main():
 
   checks = [
       StatsQuery(args.endpoint, token, args.strip_hostname_prefix),
+      nagiosplugin.ScalarContext("global-fs-used"),
+      nagiosplugin.ScalarContext("global-fs-used-percent",
+                                 warning=args.global_fs_used_warn,
+                                 critical=args.global_fs_used_critical),
+      nagiosplugin.ScalarContext("global-jvm-heap-used"),
+      nagiosplugin.ScalarContext("global-jvm-heap-used-percent",
+                                 warning=args.global_jvm_heap_used_warn,
+                                 critical=args.global_jvm_heap_used_critical),
       nagiosplugin.ScalarContext("fs-used"),
       nagiosplugin.ScalarContext("fs-used-percent",
                                  warning=args.fs_used_warn,
