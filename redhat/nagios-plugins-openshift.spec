@@ -1,7 +1,7 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.17.5
-Release: 2
+Version: 0.17.6
+Release: 1
 License: BSD-3-Clause
 Source: .
 URL: https://github.com/appuio/nagios-plugins-openshift
@@ -55,6 +55,10 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Tue Apr 16 2019 Michael Hanselmann <hansmi@vshn.ch> 0.17.6-1
+- check_openshift_es_stats:
+  - Gather cluster-wide statistics and allow application of limits.
+
 * Tue Apr 9 2019 Michael Hanselmann <hansmi@vshn.ch> 0.17.5-2
 - Patch Python programs to explicitly invoke "/usr/bin/python3.4" instead of
   "/usr/bin/python3" to handle differences in the installed default Python
