@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.17.6
+Version: 0.18.0
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -55,6 +55,14 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Wed Apr 17 2019 Michael Hanselmann <hansmi@vshn.ch> 0.18.0-1
+- check_openshift_es_stats:
+  - Avoid division by zero.
+  - Large overhaul of code structure to use loops instead of code repetition
+    with minor changes.
+  - Add statistics on available space as the opposite of used space, enabling
+    easier monitoring across clusters of different sizes.
+
 * Tue Apr 16 2019 Michael Hanselmann <hansmi@vshn.ch> 0.17.6-1
 - check_openshift_es_stats:
   - Gather cluster-wide statistics and allow application of limits.

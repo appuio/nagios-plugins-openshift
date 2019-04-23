@@ -3,7 +3,7 @@
 import argparse
 import nagiosplugin
 import requests
-import itertools
+import operator
 
 from vshn_npo import constants
 from vshn_npo import utils
@@ -13,85 +13,166 @@ def _bytes_to_mb(value):
   return int(round(value / (1024.0 * 1024), 0))
 
 
-class _CapacityStats:
-  def __init__(self, name, uom="MB"):
-    self._name = name
+class _SingleCapacity:
+  """Logic for single capacity metric.
+
+  """
+  def __init__(self, size, used, uom="MB"):
+    self._size = size
+    self._used = used
     self._uom = uom
-    self._node_size = []
-    self._node_used = []
-    self._node_used_percent = []
 
-  def add(self, name_suffix, size, used):
-    usedperc = int(100.0 * used / size)
+  @property
+  def size(self):
+    return self._size
 
-    self._node_size.append(size)
-    self._node_used.append(used)
-    self._node_used_percent.append(usedperc)
+  @property
+  def available(self):
+    return max(0, self._size - self._used)
 
-    yield nagiosplugin.Metric("{}-{}".format(self._name, name_suffix), used,
-                              uom=self._uom, min=0, max=size,
-                              context=self._name)
+  @property
+  def available_percent(self):
+    """Calculate percentage of available capacity.
 
-    yield nagiosplugin.Metric("{}-percent-{}".format(self._name, name_suffix),
-                              usedperc,
-                              uom="%", min=0, max=100,
-                              context="{}-percent".format(self._name))
+    """
+    return min(100, 100.0 - self.used_percent)
+
+  @property
+  def used(self):
+    return self._used
+
+  @property
+  def used_percent(self):
+    """Calculate percentage of used capacity.
+
+    """
+    size = self.size
+
+    if size > 0:
+      return int(100.0 * self.used / size)
+
+    return 0
+
+  def stats(self, name_fn, context_fn):
+    """Generate metrics.
+
+    """
+    for value_name, value in [
+      ("used", self.used),
+      ("available", self.available),
+    ]:
+      name = name_fn(value_name)
+
+      yield nagiosplugin.Metric(name, value, uom=self._uom, min=0, max=self.size,
+                                context=context_fn(value_name))
+
+    for value_name, value in [
+      ("used-percent", self.used_percent),
+      ("available-percent", self.available_percent),
+    ]:
+      name = name_fn(value_name)
+
+      yield nagiosplugin.Metric(name, value, uom="%", min=0, max=100,
+                                context=context_fn(value_name))
+
+
+class _NodeStats:
+  """Per-node statistics computation.
+
+  """
+  def __init__(self, data, name_suffix):
+    self._name_suffix = name_suffix
+
+    self._cpu_usage = data["process"]["cpu"]["percent"]
+
+    # TODO: Monitor per-path space, not only globally
+    allpaths = data["fs"]["total"]
+    fs_size = _bytes_to_mb(allpaths["total_in_bytes"])
+    fs_available = _bytes_to_mb(allpaths["available_in_bytes"])
+
+    memdata = data["jvm"]["mem"]
+    jvm_heap_size = _bytes_to_mb(memdata["heap_max_in_bytes"])
+    jvm_heap_used = _bytes_to_mb(memdata["heap_used_in_bytes"])
+
+    self.fs = _SingleCapacity(fs_size, fs_size - fs_available)
+    self.jvm_heap = _SingleCapacity(jvm_heap_size, jvm_heap_used)
 
   def stats(self):
-    global_size = sum(self._node_size)
-    global_used = sum(self._node_used)
-    global_used_percent = int(100.0 * global_used / global_size)
+    """Generate metrics.
 
-    yield nagiosplugin.Metric("global-{}".format(self._name), global_used,
-                              uom=self._uom, min=0, max=global_size,
-                              context="global-{}".format(self._name))
-    yield nagiosplugin.Metric("node-{}-min".format(self._name), min(self._node_used),
-                              uom=self._uom, min=0,
-                              context="default")
-    yield nagiosplugin.Metric("node-{}-max".format(self._name), max(self._node_used),
-                              uom=self._uom, min=0,
-                              context="default")
+    """
+    suffix = self._name_suffix
 
-    yield nagiosplugin.Metric("global-{}-percent".format(self._name), global_used_percent,
-                              uom="%", min=0, max=100,
-                              context="global-{}-percent".format(self._name))
-    yield nagiosplugin.Metric("node-{}-percent-min".format(self._name),
-                              min(self._node_used_percent),
+    yield nagiosplugin.Metric("process-cpu-percent-{}".format(suffix),
+                              self._cpu_usage,
                               uom="%", min=0,
-                              context="default")
-    yield nagiosplugin.Metric("node-{}-percent-max".format(self._name),
-                              max(self._node_used_percent),
-                              uom="%", min=0,
-                              context="default")
+                              context="process-cpu-percent")
+
+    yield from self.fs.stats(lambda value_name: "fs-{}-{}".format(value_name, suffix),
+                             lambda value_name: "fs-{}".format(value_name))
+
+    yield from self.fs.stats(lambda value_name: "jvm-heap-{}-{}".format(value_name, suffix),
+                             lambda value_name: "jvm-heap-{}".format(value_name))
 
 
-def _FsStats(stats, suffix, data):
-  # TODO: Monitor per-path space, not only globally
-  allpaths = data["total"]
+def capacity_stats(name, items, uom="MB"):
+  """Calculate metrics over any number of capacity metrics.
 
-  availmb = _bytes_to_mb(allpaths["available_in_bytes"])
-  totalmb = _bytes_to_mb(allpaths["total_in_bytes"])
-  usedmb = totalmb - availmb
+  """
+  total_size = 0
+  total_used = 0
+  total_available = 0
 
-  yield from stats.add(suffix, totalmb, usedmb)
+  for i in items:
+    total_size += i.size
+    total_used += i.used
+    total_available += i.available
 
+  for name_pattern, value in [
+    ("total-{}-used", total_used),
+    ("total-{}-available", max(0, total_size - total_used)),
+  ]:
+    metric_name = name_pattern.format(name)
 
-def _ProcessStats(suffix, data):
-  cpudata = data["cpu"]
+    yield nagiosplugin.Metric(metric_name, value, uom=uom,
+                              min=0, max=total_size,
+                              context=metric_name)
 
-  yield nagiosplugin.Metric("process-cpu-percent-{}".format(suffix),
-                            cpudata["percent"],
-                            uom="%", min=0,
-                            context="process-cpu-percent")
+  if total_size > 0:
+    for value_name, value in [
+      ("used", total_used),
+      ("available", total_available),
+    ]:
+      metric_name = "total-{}-{}-percent".format(name, value_name)
+      total_percent = int(100.0 * value / total_size)
 
+      yield nagiosplugin.Metric(metric_name, total_percent, uom="%",
+                                min=0, max=100, context=metric_name)
 
-def _JvmStats(stats, suffix, data):
-  memdata = data["mem"]
+  if items:
+    for selector_name, selector_fn in [
+      ("min", min),
+      ("max", max),
+    ]:
+      name_fn = lambda middle: "node-{}-{}-{}".format(name, middle, selector_name)
+      value_fn = lambda key_fn: selector_fn(map(key_fn, items))
 
-  heap_max_mb = _bytes_to_mb(memdata["heap_max_in_bytes"])
-  heap_used_mb = _bytes_to_mb(memdata["heap_used_in_bytes"])
+      for name_middle, key_fn in [
+        ("used", operator.attrgetter("used")),
+        ("available", operator.attrgetter("available")),
+      ]:
+        yield nagiosplugin.Metric(name_fn(name_middle), value_fn(key_fn),
+                                  uom=uom, min=0,
+                                  context="default")
 
-  yield from stats.add(suffix, heap_max_mb, heap_used_mb)
+      for name_middle, key_fn in [
+        ("used-percent", operator.attrgetter("used_percent")),
+        ("available-percent", operator.attrgetter("available_percent")),
+      ]:
+        yield nagiosplugin.Metric(name_fn(name_middle), value_fn(key_fn),
+                                  uom="%", min=0, max=100,
+                                  context="default")
+
 
 class StatsQuery(nagiosplugin.Resource):
   def __init__(self, endpoint, token, strip_hostname_prefix):
@@ -110,28 +191,88 @@ class StatsQuery(nagiosplugin.Resource):
 
     data = response.json()
 
-    fs_used_stats = _CapacityStats("fs-used")
-    jvm_heap_used_stats = _CapacityStats("jvm-heap-used")
+    nodes = []
+
+    # fs_stats = _CapacityStats("fs")
+    # jvm_heap_stats = _CapacityStats("jvm-heap")
 
     # Data structure documentation:
     # https://www.elastic.co/guide/en/elasticsearch/reference/2.4/cluster-nodes-stats.html#fs-info
-    for node in data["nodes"].values():
+    for node_data in data["nodes"].values():
       # In a cluster outside OpenShift there could be more than one
       # Elasticsearch instance per host, but in OpenShift every container has
       # its own name.
-      suffix = node["name"]
+      suffix = node_data["name"]
 
       for i in self._strip_hostname_prefix:
         if suffix.startswith(i):
           suffix = suffix[len(i):]
           break
 
-      yield from _FsStats(fs_used_stats, suffix, node["fs"])
-      yield from _ProcessStats(suffix, node["process"])
-      yield from _JvmStats(jvm_heap_used_stats, suffix, node["jvm"])
+      node = _NodeStats(node_data, suffix)
+      nodes.append(node)
 
-    yield from fs_used_stats.stats()
-    yield from jvm_heap_used_stats.stats()
+      yield from node.stats()
+
+    for capacity_name, attr_name in [
+      ("fs", "fs"),
+      ("jvm-heap", "jvm_heap"),
+    ]:
+      yield from \
+          capacity_stats(capacity_name, [getattr(n, attr_name) for n in nodes])
+
+
+class _CapacityArgs:
+  """Utility to generate and use CLI arguments for capacity metrics.
+
+  """
+  _METRICS = frozenset({
+    "used",
+    "used-percent",
+    "available",
+    "available-percent",
+  })
+  _METRIC_STATUS = [
+    (metric, status_name)
+    for metric in _METRICS
+    for status_name in ["warn", "critical"]
+  ]
+
+  def __init__(self, name):
+    self._name = name
+
+  def _make_arg_dest(self, scope_name, metric, status_name):
+    return ("{}_{}_{}_{}".
+            format(self._name, scope_name, metric, status_name).
+            replace("-", "_"))
+
+  def add_arguments(self, global_args, node_args):
+    """Add arguments to given argument groups.
+
+    """
+    for metric, status_name in self._METRIC_STATUS:
+      arg_name = "--total-{}-{}-{}".format(self._name, metric, status_name)
+      arg_dest = self._make_arg_dest("total", metric, status_name)
+      global_args.add_argument(arg_name, metavar="RANGE", dest=arg_dest)
+
+      arg_name = "--{}-{}-{}".format(self._name, metric, status_name)
+      arg_dest = self._make_arg_dest("node", metric, status_name)
+      node_args.add_argument(arg_name, metavar="RANGE", dest=arg_dest)
+
+  def make_contexts(self, args):
+    for metric in self._METRICS:
+      for ctx_name_prefix, scope_name in [
+        ("total-", "total"),
+        ("", "node"),
+      ]:
+        ctx_name = "{}{}-{}".format(ctx_name_prefix, self._name, metric)
+
+        warn_dest = self._make_arg_dest(scope_name, metric, "warn")
+        crit_dest = self._make_arg_dest(scope_name, metric, "critical")
+
+        yield nagiosplugin.ScalarContext(ctx_name,
+                                         warning=getattr(args, warn_dest),
+                                         critical=getattr(args, crit_dest))
 
 
 @nagiosplugin.guarded
@@ -142,26 +283,23 @@ def main():
   parser.add_argument("--strip-hostname-prefix", metavar="PREFIX",
                       action="append",
                       help="Strip given prefix from node names")
-  parser.add_argument("--fs-used-warn", metavar="RANGE",
-                      help="Warn if consumed disk space on any node is above given percentage")
-  parser.add_argument("--fs-used-critical", metavar="RANGE",
-                      help="Critical if consumed disk space on any node is above given percentage")
-  parser.add_argument("--global-fs-used-warn", metavar="RANGE",
-                      help="Warn if consumed disk space across all nodes is above given percentage")
-  parser.add_argument("--global-fs-used-critical", metavar="RANGE",
-                      help="Critical if consumed disk space across all nodes is above given percentage")
-  parser.add_argument("--cpu-usage-warn", metavar="RANGE",
-                      help="Warn if CPU usage on any node is above given percentage")
-  parser.add_argument("--cpu-usage-critical", metavar="RANGE",
-                      help="Critical if CPU usage on any node is above given percentage")
-  parser.add_argument("--jvm-heap-used-warn", metavar="RANGE",
-                      help="Warn if JVM heap usage on any node is above given percentage")
-  parser.add_argument("--jvm-heap-used-critical", metavar="RANGE",
-                      help="Critical if JVM heap usage on any node is above given percentage")
-  parser.add_argument("--global-jvm-heap-used-warn", metavar="RANGE",
-                      help="Warn if JVM heap usage across all nodes is above given percentage")
-  parser.add_argument("--global-jvm-heap-used-critical", metavar="RANGE",
-                      help="Critical if JVM heap usage across all nodes is above given percentage")
+
+  glargs = parser.add_argument_group("Global")
+  nodeargs = parser.add_argument_group("Per node")
+
+  for name, desc in [
+    ("cpu", "CPU usage")
+  ]:
+    nodeargs.add_argument("--{}-usage-warn".format(name), metavar="RANGE")
+    nodeargs.add_argument("--{}-usage-critical".format(name), metavar="RANGE")
+
+  capacity_args = [
+    _CapacityArgs("fs"),
+    _CapacityArgs("jvm-heap"),
+  ]
+
+  for i in capacity_args:
+    i.add_arguments(glargs, nodeargs)
 
   parser.add_argument("--endpoint", required=True, metavar="URL",
                       help="API endpoint")
@@ -181,26 +319,13 @@ def main():
 
   checks = [
       StatsQuery(args.endpoint, token, args.strip_hostname_prefix),
-      nagiosplugin.ScalarContext("global-fs-used"),
-      nagiosplugin.ScalarContext("global-fs-used-percent",
-                                 warning=args.global_fs_used_warn,
-                                 critical=args.global_fs_used_critical),
-      nagiosplugin.ScalarContext("global-jvm-heap-used"),
-      nagiosplugin.ScalarContext("global-jvm-heap-used-percent",
-                                 warning=args.global_jvm_heap_used_warn,
-                                 critical=args.global_jvm_heap_used_critical),
-      nagiosplugin.ScalarContext("fs-used"),
-      nagiosplugin.ScalarContext("fs-used-percent",
-                                 warning=args.fs_used_warn,
-                                 critical=args.fs_used_critical),
       nagiosplugin.ScalarContext("process-cpu-percent",
                                  warning=args.cpu_usage_warn,
                                  critical=args.cpu_usage_critical),
-      nagiosplugin.ScalarContext("jvm-heap-used"),
-      nagiosplugin.ScalarContext("jvm-heap-used-percent",
-                                 warning=args.jvm_heap_used_warn,
-                                 critical=args.jvm_heap_used_critical),
       ]
+
+  for i in capacity_args:
+    checks.extend(i.make_contexts(args))
 
   nagiosplugin.Check(*checks).main(verbose=args.verbose, timeout=None)
 

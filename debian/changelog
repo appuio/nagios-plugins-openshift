@@ -1,3 +1,14 @@
+nagios-plugins-openshift (0.18.0) xenial; urgency=medium
+
+  check_openshift_es_stats:
+  * Avoid division by zero.
+  * Large overhaul of code structure to use loops instead of code repetition
+    with minor changes.
+  * Add statistics on available space as the opposite of used space, enabling
+    easier monitoring across clusters of different sizes.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Wed, 17 Apr 2019 17:13:31 +0200
+
 nagios-plugins-openshift (0.17.6) xenial; urgency=medium
 
   check_openshift_es_stats:
