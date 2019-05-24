@@ -1,3 +1,12 @@
+nagios-plugins-openshift (0.18.1) xenial; urgency=medium
+
+  check_openshift_es_stats:
+  * Actually report JVM heap stats, used to be filesystem stats since version
+    0.18.0.
+  * Report usage of non-heap memory in JVM and JVM garbage collectors metrics.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Fri, 24 May 2019 13:32:50 +0200
+
 nagios-plugins-openshift (0.18.0) xenial; urgency=medium
 
   check_openshift_es_stats:
