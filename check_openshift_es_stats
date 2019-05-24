@@ -193,9 +193,6 @@ class StatsQuery(nagiosplugin.Resource):
 
     nodes = []
 
-    # fs_stats = _CapacityStats("fs")
-    # jvm_heap_stats = _CapacityStats("jvm-heap")
-
     # Data structure documentation:
     # https://www.elastic.co/guide/en/elasticsearch/reference/2.4/cluster-nodes-stats.html#fs-info
     for node_data in data["nodes"].values():
