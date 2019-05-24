@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.18.0
+Version: 0.18.1
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -55,6 +55,12 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Fri May 24 2019 Michael Hanselmann <hansmi@vshn.ch> 0.18.1-1
+- check_openshift_es_stats:
+  - Actually report JVM heap stats, used to be filesystem stats since version
+    0.18.0.
+  - Report usage of non-heap memory in JVM and JVM garbage collectors metrics.
+
 * Wed Apr 17 2019 Michael Hanselmann <hansmi@vshn.ch> 0.18.0-1
 - check_openshift_es_stats:
   - Avoid division by zero.
