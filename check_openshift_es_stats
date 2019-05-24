@@ -111,8 +111,8 @@ class _NodeStats:
     yield from self.fs.stats(lambda value_name: "fs-{}-{}".format(value_name, suffix),
                              lambda value_name: "fs-{}".format(value_name))
 
-    yield from self.fs.stats(lambda value_name: "jvm-heap-{}-{}".format(value_name, suffix),
-                             lambda value_name: "jvm-heap-{}".format(value_name))
+    yield from self.jvm_heap.stats(lambda value_name: "jvm-heap-{}-{}".format(value_name, suffix),
+                                   lambda value_name: "jvm-heap-{}".format(value_name))
 
 
 def capacity_stats(name, items, uom="MB"):
