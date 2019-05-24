@@ -81,21 +81,28 @@ class _NodeStats:
 
   """
   def __init__(self, data, name_suffix):
+    self._data = data
     self._name_suffix = name_suffix
-
-    self._cpu_usage = data["process"]["cpu"]["percent"]
 
     # TODO: Monitor per-path space, not only globally
     allpaths = data["fs"]["total"]
     fs_size = _bytes_to_mb(allpaths["total_in_bytes"])
     fs_available = _bytes_to_mb(allpaths["available_in_bytes"])
 
-    memdata = data["jvm"]["mem"]
+    memdata = self._mem_data
     jvm_heap_size = _bytes_to_mb(memdata["heap_max_in_bytes"])
     jvm_heap_used = _bytes_to_mb(memdata["heap_used_in_bytes"])
 
     self.fs = _SingleCapacity(fs_size, fs_size - fs_available)
     self.jvm_heap = _SingleCapacity(jvm_heap_size, jvm_heap_used)
+
+  @property
+  def _process_cpu_percent(self):
+    return self._data["process"]["cpu"]["percent"]
+
+  @property
+  def _mem_data(self):
+    return self._data["jvm"]["mem"]
 
   def stats(self):
     """Generate metrics.
@@ -103,10 +110,15 @@ class _NodeStats:
     """
     suffix = self._name_suffix
 
+    non_heap_used_in_bytes = _bytes_to_mb(self._mem_data["non_heap_used_in_bytes"])
+
     yield nagiosplugin.Metric("process-cpu-percent-{}".format(suffix),
-                              self._cpu_usage,
-                              uom="%", min=0,
+                              self._process_cpu_percent, uom="%", min=0,
                               context="process-cpu-percent")
+
+    yield nagiosplugin.Metric("jvm-non-heap-used-{}".format(suffix),
+                              non_heap_used_in_bytes, uom="MB", min=0,
+                              context="default")
 
     yield from self.fs.stats(lambda value_name: "fs-{}-{}".format(value_name, suffix),
                              lambda value_name: "fs-{}".format(value_name))
