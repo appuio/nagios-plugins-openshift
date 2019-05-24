@@ -104,6 +104,40 @@ class _NodeStats:
   def _mem_data(self):
     return self._data["jvm"]["mem"]
 
+  def _gc_stats(self):
+    gc = self._data["jvm"]["gc"]
+
+    uptime_in_millis = float(self._data["jvm"]["uptime_in_millis"])
+
+    for gc_name, gc_data in gc["collectors"].items():
+      collection_count = int(gc_data["collection_count"])
+      collection_time_in_millis = int(gc_data["collection_time_in_millis"])
+      collection_time_avg = \
+          round(float(collection_time_in_millis) / collection_count / 1000.0, 5)
+      collection_time_percent = \
+          round(100.0 * collection_time_in_millis / uptime_in_millis, 5)
+
+      name_fn = lambda middle: \
+          ("jvm-gc-collector-{}-{}-{}".
+           format(gc_name, middle, self._name_suffix))
+
+      yield nagiosplugin.Metric(name_fn("collection-count"),
+                                collection_count, min=0,
+                                context="default")
+
+      yield nagiosplugin.Metric(name_fn("collection-time"),
+                                round(collection_time_in_millis / 1000.0),
+                                uom="s", min=0,
+                                context="default")
+
+      yield nagiosplugin.Metric(name_fn("collection-time-avg"),
+                                collection_time_avg, uom="s", min=0,
+                                context="jvm-gc-collection-time-avg")
+
+      yield nagiosplugin.Metric(name_fn("collection-time-percent"),
+                                collection_time_percent, uom="%", min=0, max=100,
+                                context="jvm-gc-collection-time-percent")
+
   def stats(self):
     """Generate metrics.
 
@@ -125,6 +159,8 @@ class _NodeStats:
 
     yield from self.jvm_heap.stats(lambda value_name: "jvm-heap-{}-{}".format(value_name, suffix),
                                    lambda value_name: "jvm-heap-{}".format(value_name))
+
+    yield from self._gc_stats()
 
 
 def capacity_stats(name, items, uom="MB"):
@@ -297,10 +333,14 @@ def main():
   nodeargs = parser.add_argument_group("Per node")
 
   for name, desc in [
-    ("cpu", "CPU usage")
+    ("cpu-usage", "CPU usage"),
+    ("jvm-gc-collection-time-avg",
+     "Average JVM GC collection duration"),
+    ("jvm-gc-collection-time-percent",
+     "Percentage of JVM GC collection time relative to uptime"),
   ]:
-    nodeargs.add_argument("--{}-usage-warn".format(name), metavar="RANGE")
-    nodeargs.add_argument("--{}-usage-critical".format(name), metavar="RANGE")
+    nodeargs.add_argument("--{}-warn".format(name), metavar="RANGE")
+    nodeargs.add_argument("--{}-critical".format(name), metavar="RANGE")
 
   capacity_args = [
     _CapacityArgs("fs"),
@@ -331,6 +371,12 @@ def main():
       nagiosplugin.ScalarContext("process-cpu-percent",
                                  warning=args.cpu_usage_warn,
                                  critical=args.cpu_usage_critical),
+      nagiosplugin.ScalarContext("jvm-gc-collection-time-avg",
+                                 warning=args.jvm_gc_collection_time_avg_warn,
+                                 critical=args.jvm_gc_collection_time_avg_critical),
+      nagiosplugin.ScalarContext("jvm-gc-collection-time-percent",
+                                 warning=args.jvm_gc_collection_time_percent_warn,
+                                 critical=args.jvm_gc_collection_time_percent_critical),
       ]
 
   for i in capacity_args:
