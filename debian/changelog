@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.18.2) xenial; urgency=medium
+
+  check_openshift_object_stats:
+  * Emit object deletion timestamp as metric.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Tue, 28 May 2019 16:22:07 +0200
+
 nagios-plugins-openshift (0.18.1) xenial; urgency=medium
 
   check_openshift_es_stats:

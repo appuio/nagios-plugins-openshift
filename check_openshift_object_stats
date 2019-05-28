@@ -196,12 +196,20 @@ def relative_timestamp:
       "value": .,
       "uom": "c"
     },
-    {
-      "label": "elapsed",
-      "value": (now - .) | floor,
-      "uom": "s",
-      "min": 0
-    }
+    (
+      now as $now |
+      # Emit only when timestamp is in the past
+      if $now >= . then
+        {
+          "label": "elapsed",
+          "value": ($now - .) | floor,
+          "uom": "s",
+          "min": 0
+        }
+      else
+        empty
+      end
+    )
   )
 ;
 
@@ -235,6 +243,17 @@ reduce .items[] as $obj ({};
         "value": 1,
         "min": 0
       }
+    ),
+
+    (
+      ($obj.metadata.deletionTimestamp | parse_timestamp) as $deletion_ts |
+      if $deletion_ts then
+        $deletion_ts |
+        relative_timestamp |
+        .label |= "\($obj_prefix).deletion.\(.)"
+      else
+        empty
+      end
     ),
 
     if $kind == "cronjob" then
