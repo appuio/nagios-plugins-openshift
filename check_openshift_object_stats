@@ -301,7 +301,6 @@ reduce .items[] as $obj ({};
         ($job_status.startTime? | parse_timestamp) as $start_time_ts |
         ($job_status.completionTime? | parse_timestamp) as $completion_time_ts |
         ($completion_time_ts and
-         ($job_status.failed // 0) == 0 and
          ($job_status.active // 0) == 0 and
          ($job_status.succeeded // 0) > 0) as $successful |
 
