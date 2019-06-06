@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.18.2
+Version: 1.18.3
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -55,6 +55,10 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Thu Jun 6 2019 Michael Hanselmann <hansmi@vshn.ch> 0.18.3-1
+- check_openshift_object_stats:
+  - Ignore failed count when determining whether Job succeeded.
+
 * Tue May 28 2019 Michael Hanselmann <hansmi@vshn.ch> 0.18.2-1
 - check_openshift_object_stats:
   - Emit object deletion timestamp as metric.
