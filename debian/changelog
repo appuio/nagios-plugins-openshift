@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.18.5) xenial; urgency=medium
+
+  new-app-and-wait:
+  * Add workaround for service account token generation is delayed.
+
+ -- Gabriel Mainberger <gabriel.mainberger@vshn.ch>  Mon, 17 Jun 2019 15:08:21 +0200
+
 nagios-plugins-openshift (0.18.4) xenial; urgency=medium
 
   check_openshift_object_stats:

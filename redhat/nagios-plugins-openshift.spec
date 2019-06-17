@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.18.4
+Version: 0.18.5
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -55,6 +55,10 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Mon Jun 17 2019 Gabriel Mainberger <gabriel.mainberger@vshn.ch> 0.18.5-1
+- new-app-and-wait:
+  - Add workaround for service account token generation is delayed.
+
 * Thu Jun 6 2019 Michael Hanselmann <hansmi@vshn.ch> 0.18.4-1
 - check_openshift_object_stats:
   - Ignore failed count when determining whether Job succeeded.

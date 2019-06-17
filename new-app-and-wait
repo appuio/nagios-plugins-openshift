@@ -240,6 +240,9 @@ def main():
   parser.add_argument("--pattern-from", type=argparse.FileType("r"),
                       default=None, metavar="FILE",
                       help="Load expected pattern from file")
+  parser.add_argument("--project-initial-wait", type=int, metavar="SEC", default=3,
+                      help=("Wait for given number of seconds after creating"
+                            " the project until starting the build"))
   parser.add_argument("config", type=str,
                       help="Configuration file with login credentials")
   parser.add_argument("source", type=str,
@@ -274,6 +277,10 @@ def main():
     project_name = oc_client.create_project(cl, namer)
 
     cl.namespace = project_name
+
+    # Workaround for service account token generation is delayed
+    # https://bugzilla.redhat.com/show_bug.cgi?id=1719792
+    time.sleep(args.project_initial_wait)
 
     try:
       (url, duration) = Check(cl, args, timeout)
