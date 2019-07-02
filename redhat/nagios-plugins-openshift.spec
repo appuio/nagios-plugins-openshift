@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.18.5
+Version: 0.18.6
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -55,6 +55,12 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Tue Jul 2 2019 Michael Hanselmann <hansmi@vshn.ch> 0.18.6-1
+- check_openshift_object_stats:
+  - Additional metrics are produced for pods in "pending" phase:
+    "pending.unscheduled" for any unscheduled pods and "pending.slow" for pods
+    in such a state for more than 5 minutes.
+
 * Mon Jun 17 2019 Gabriel Mainberger <gabriel.mainberger@vshn.ch> 0.18.5-1
 - new-app-and-wait:
   - Add workaround for service account token generation is delayed.
