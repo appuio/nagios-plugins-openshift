@@ -222,6 +222,7 @@ reduce .items[] as $obj ({};
   ($obj | object_namespace) as $ns |
   ($obj.metadata.name) as $obj_name |
   ($obj | object_kind) as $kind |
+  ($obj.status?) as $obj_status |
   "project.\($ns)" as $ns_prefix |
   "\($ns_prefix).\($kind).\($obj_name)" as $obj_prefix |
 
@@ -266,7 +267,7 @@ reduce .items[] as $obj ({};
       else
         empty
       end,
-      ($obj.status?.lastScheduleTime? | parse_timestamp) as $last_schedule_time_ts |
+      ($obj_status.lastScheduleTime? | parse_timestamp) as $last_schedule_time_ts |
       if $last_schedule_time_ts then
         $last_schedule_time_ts |
         relative_timestamp |
@@ -284,8 +285,7 @@ reduce .items[] as $obj ({};
         }
       )
     elif $kind == "job" then
-      $obj.status? as $job_status |
-      if $job_status then
+      if $obj_status then
         (
           ($obj.metadata?.ownerReferences? // []) |
           map(select(.controller and (.kind? | ascii_downcase) == "cronjob")) |
@@ -298,17 +298,17 @@ reduce .items[] as $obj ({};
             null
           end
         ) as $controller_prefix |
-        ($job_status.startTime? | parse_timestamp) as $start_time_ts |
-        ($job_status.completionTime? | parse_timestamp) as $completion_time_ts |
+        ($obj_status.startTime? | parse_timestamp) as $start_time_ts |
+        ($obj_status.completionTime? | parse_timestamp) as $completion_time_ts |
         ($completion_time_ts and
-         ($job_status.active // 0) == 0 and
-         ($job_status.succeeded // 0) > 0) as $successful |
+         ($obj_status.active // 0) == 0 and
+         ($obj_status.succeeded // 0) > 0) as $successful |
 
         (
           # Pod counts
           ("active", "failed", "succeeded") | (
             . as $field |
-            $job_status[$field]? as $value |
+            $obj_status[$field]? as $value |
             select($value != null) | {
               "label": $field,
               "value": $value,
