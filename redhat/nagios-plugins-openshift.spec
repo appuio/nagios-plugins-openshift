@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.18.6
+Version: 0.18.7
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -55,6 +55,16 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Fri Jul 5 2019 Michael Hanselmann <hansmi@vshn.ch> 0.18.7-1
+- check_openshift_object_stats:
+  - Version 0.18.6 introduced "pending.slow" and "pending.unscheduled" metrics.
+    As it turned out these weren't too useful, in particular due to the
+    hardcoded delay of 5 minutes. With this version the metrics are changed to
+    emit the amount of time since an object was created combined
+    ("project.foo.pod.bar-1.creation.elapsed") with, for pods, the phase
+    ("project.foo.pod.bar-1.pending.elapsed") and whether they're unscheduled
+    ("project.foo.pod.bar-1.unscheduled.elapsed").
+
 * Tue Jul 2 2019 Michael Hanselmann <hansmi@vshn.ch> 0.18.6-1
 - check_openshift_object_stats:
   - Additional metrics are produced for pods in "pending" phase:

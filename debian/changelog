@@ -1,3 +1,16 @@
+nagios-plugins-openshift (0.18.7) xenial; urgency=medium
+
+  check_openshift_object_stats:
+  * Version 0.18.6 introduced "pending.slow" and "pending.unscheduled"
+    metrics. As it turned out these weren't too useful, in particular due to
+    the hardcoded delay of 5 minutes. With this version the metrics are
+    changed to emit the amount of time since an object was created combined
+    ("project.foo.pod.bar-1.creation.elapsed") with, for pods, the phase
+    ("project.foo.pod.bar-1.pending.elapsed") and whether they're unscheduled
+    ("project.foo.pod.bar-1.unscheduled.elapsed").
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Fri, 05 Jul 2019 17:05:22 +0200
+
 nagios-plugins-openshift (0.18.6) xenial; urgency=medium
 
   check_openshift_object_stats:

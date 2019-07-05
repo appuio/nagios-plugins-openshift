@@ -139,9 +139,6 @@ process_data() {
     --argjson state_warning "$state_warning" \
     --argjson state_critical "$state_critical" \
     --argjson state_unknown "$state_unknown" '
-# Number of seconds before a pod is considered "slow" in starting
-300 as $pending_slow_age |
-
 def verbose:
   ($opt_verbose | length) > 0
 ;
@@ -238,25 +235,7 @@ reduce .items[] as $obj ({};
         "",
         if $kind == "pod" then
           # https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase
-          ($obj_status.phase | ascii_downcase) as $pod_phase |
-          (
-            ".\($pod_phase)",
-            if $pod_phase == "pending" then
-              ($obj_status.startTime? | parse_timestamp) as $start_ts |
-              ($obj_status.conditions? // []) | map(select(
-                (.type | ascii_downcase) == "podscheduled"
-              )) |
-              if (. | length == 0) or (first | .status | ascii_downcase) != "true" then
-                ".\($pod_phase).unscheduled"
-              elif $start_ts and (now - $start_ts) > $pending_slow_age then
-                ".\($pod_phase).slow"
-              else
-                empty
-              end
-            else
-              empty
-            end
-          )
+          ".\($obj_status.phase | ascii_downcase)"
         else
           empty
         end
@@ -273,6 +252,41 @@ reduce .items[] as $obj ({};
         $deletion_ts |
         relative_timestamp |
         .label |= "\($obj_prefix).deletion.\(.)"
+      else
+        empty
+      end
+    ),
+
+    (
+      ($obj.metadata.creationTimestamp? | parse_timestamp) as $create_ts |
+      if $create_ts then
+        $create_ts |
+        relative_timestamp |
+        (
+          .label |= "creation.\(.)",
+          if $kind == "pod" then
+            . as $metric |
+            ($obj_status.phase | ascii_downcase) as $pod_phase |
+            (
+              ($metric | .label |= "\($pod_phase).\(.)"),
+              if $pod_phase == "pending" then
+                if ($obj_status.conditions? // []) | any(
+                  (.type | ascii_downcase) == "podscheduled" and
+                  (.status | ascii_downcase) == "true"
+                ) then
+                  empty
+                else
+                  $metric | .label |= "unscheduled.\(.)"
+                end
+              else
+                empty
+              end
+            )
+          else
+            empty
+          end
+        ) |
+        .label |= "\($obj_prefix).\(.)"
       else
         empty
       end
