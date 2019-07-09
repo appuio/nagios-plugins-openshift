@@ -1,3 +1,14 @@
+nagios-plugins-openshift (0.18.8) xenial; urgency=medium
+
+  check_openshift_object_stats:
+  * Version 0.18.7 started to emit metrics on how long a pending pod has
+    existed. An additional metric was generated for unscheduled pods. These
+    would usually show up alongside a "pending for too long" alert which is
+    redundant. With this version a pod is either "pending" or "unscheduled",
+    but not both.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Mon, 08 Jul 2019 17:07:05 +0200
+
 nagios-plugins-openshift (0.18.7) xenial; urgency=medium
 
   check_openshift_object_stats:

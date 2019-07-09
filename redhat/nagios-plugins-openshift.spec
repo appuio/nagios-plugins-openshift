@@ -55,6 +55,14 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Mon Jul 8 2019 Michael Hanselmann <hansmi@vshn.ch> 0.18.8-1
+- check_openshift_object_stats:
+  - Version 0.18.7 started to emit metrics on how long a pending pod has
+    existed. An additional metric was generated for unscheduled pods. These
+    would usually show up alongside a "pending for too long" alert which is
+    redundant. With this version a pod is either "pending" or "unscheduled",
+    but not both.
+
 * Fri Jul 5 2019 Michael Hanselmann <hansmi@vshn.ch> 0.18.7-1
 - check_openshift_object_stats:
   - Version 0.18.6 introduced "pending.slow" and "pending.unscheduled" metrics.

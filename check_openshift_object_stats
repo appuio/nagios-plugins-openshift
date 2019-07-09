@@ -267,21 +267,20 @@ reduce .items[] as $obj ({};
           if $kind == "pod" then
             . as $metric |
             ($obj_status.phase | ascii_downcase) as $pod_phase |
-            (
-              ($metric | .label |= "\($pod_phase).\(.)"),
-              if $pod_phase == "pending" then
-                if ($obj_status.conditions? // []) | any(
-                  (.type | ascii_downcase) == "podscheduled" and
-                  (.status | ascii_downcase) == "true"
-                ) then
-                  empty
-                else
-                  $metric | .label |= "unscheduled.\(.)"
-                end
+            $metric | .label |= "\(
+              if $pod_phase == "pending" and
+                (
+                  ($obj_status.conditions? // []) | any(
+                    (.type | ascii_downcase) == "podscheduled" and
+                    (.status | ascii_downcase) == "true"
+                  ) | not
+                )
+              then
+                "unscheduled"
               else
-                empty
+                $pod_phase
               end
-            )
+            ).\(.)"
           else
             empty
           end
