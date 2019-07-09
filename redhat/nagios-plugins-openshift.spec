@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.18.7
+Version: 0.18.8
 Release: 1
 License: BSD-3-Clause
 Source: .
