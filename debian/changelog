@@ -1,3 +1,12 @@
+nagios-plugins-openshift (0.18.9) xenial; urgency=medium
+
+  check_openshift_object_stats:
+  * Fractions on the number of pods in a pending, running or other phase are
+    calculated relative to the total number of pods in a given scope
+    (cluster-global or namespace).
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Thu, 11 Jul 2019 14:58:09 +0200
+
 nagios-plugins-openshift (0.18.8) xenial; urgency=medium
 
   check_openshift_object_stats:
