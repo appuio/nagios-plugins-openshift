@@ -239,11 +239,23 @@ reduce .items[] as $obj ({};
         else
           empty
         end
-      ) | {
-        "label": "\($prefix).\($kind)\(.).count",
-        "value": 1,
-        "min": 0
-      }
+      ) | (
+        {
+          "label": "\($prefix).\($kind)\(.).count",
+          "value": 1,
+          "min": 0
+        },
+        if (. | length) > 0 then
+          {
+            "label": "\($prefix).\($kind)\(.).fraction",
+            "value": 1,
+            "selector": "percentage_of",
+            "selector_key": "\($prefix).\($kind).count"
+          }
+        else
+          empty
+        end
+      )
     ),
 
     (
@@ -439,13 +451,42 @@ reduce .items[] as $obj ({};
   )
 ) |
 
+. as $collected_data |
+
 # Convert to flat array, retrieve and evaluate limits
 to_entries | map(
+  if .value.selector == "percentage_of" then
+    # Compute percentages
+    . as $entry |
+    (
+      ($entry.value | selector_key) as $selector_key |
+      $collected_data[$selector_key] |
+      if . == null then
+        error("\($selector_key) value not found")
+      else
+        .value
+      end
+    ) as $total_count |
+    if $total_count != null and $total_count > 0 then
+      $entry |
+      .value |= {
+        "value": (((1000.0 * .value / $total_count) | floor) / 10.0),
+        "min": 0,
+        "max": 100,
+        "uom": "%"
+      }
+    else
+      empty
+    end
+  else
+    .
+  end |
   {
     "name": .key,
     "value": .value.value,
     "uom": .value.uom,
     "min": .value.min,
+    "max": .value.max,
     "warn": find_limit(.key; "warn"),
     "crit": find_limit(.key; "crit")
   } |
@@ -518,7 +559,7 @@ $perfdata | map(
       .min = 0
     ]
   ) |
-  map("\u0027\(.name)\u0027=\(.value)\(.uom // "");\(.warn // "");\(.crit // "");\(.min // "")") |
+  map("\u0027\(.name)\u0027=\(.value)\(.uom // "");\(.warn // "");\(.crit // "");\(.min // "");\(.max // "")") |
   join(if verbose then "\n" else " " end)
 ) as $fmtperfdata |
 
