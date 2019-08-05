@@ -238,7 +238,7 @@ def state_prefix:
   )]"
 ;
 
-def relative_timestamp:
+def relative_timestamp($since_ts):
   (
     {
       "label": "absolute",
@@ -258,8 +258,32 @@ def relative_timestamp:
       else
         empty
       end
+    ),
+    (
+      # Emit only when timestamp is in the past
+      if $since_ts and $since_ts <= . then
+        {
+          "label": "after",
+          "value": (. - $since_ts) | floor,
+          "uom": "s",
+          "min": 0
+        }
+      else
+        empty
+      end
     )
   )
+;
+
+def condition_timestamp($create_ts; $time; $label_prefix):
+  ($time | parse_timestamp) as $ts |
+  if $ts then
+    $ts |
+    relative_timestamp($create_ts) |
+    .label |= "\($label_prefix).\(.)"
+  else
+    empty
+  end
 ;
 
 def selector_key:
@@ -275,6 +299,7 @@ reduce .items[] as $obj ({};
   . as $state |
   ($obj | object_namespace) as $ns |
   ($obj.metadata.name) as $obj_name |
+  ($obj.metadata.creationTimestamp? | parse_timestamp) as $create_ts |
   ($obj | object_kind) as $kind |
   ($obj.status?) as $obj_status |
   "project.\($ns)" as $ns_prefix |
@@ -316,7 +341,7 @@ reduce .items[] as $obj ({};
       ($obj.metadata.deletionTimestamp | parse_timestamp) as $deletion_ts |
       if $deletion_ts then
         $deletion_ts |
-        relative_timestamp |
+        relative_timestamp($create_ts) |
         .label |= "\($obj_prefix).deletion.\(.)"
       else
         empty
@@ -324,10 +349,9 @@ reduce .items[] as $obj ({};
     ),
 
     (
-      ($obj.metadata.creationTimestamp? | parse_timestamp) as $create_ts |
       if $create_ts then
         $create_ts |
-        relative_timestamp |
+        relative_timestamp(null) |
         (
           .label |= "creation.\(.)",
           if $kind == "pod" then
@@ -357,6 +381,22 @@ reduce .items[] as $obj ({};
       end
     ),
 
+    (
+      ($obj_status.conditions? // [])[] |
+      (
+        . as $condition |
+        (
+          condition_timestamp($create_ts; .lastProbeTime?; "lastprobe"),
+          condition_timestamp($create_ts; .lastTransitionTime?; "lasttransition")
+        ) |
+        (
+          .,
+          .label |= "status.\($condition.status | ascii_downcase).\(.)"
+        ) |
+        .label |= "\($obj_prefix).condition.\($condition.type | ascii_downcase).\(.)"
+      )
+    ),
+
     if $kind == "cronjob" then
       $obj.spec? as $cronjob_spec |
       if $cronjob_spec then
@@ -370,14 +410,14 @@ reduce .items[] as $obj ({};
       ($obj_status.lastScheduleTime? | parse_timestamp) as $last_schedule_time_ts |
       if $last_schedule_time_ts then
         $last_schedule_time_ts |
-        relative_timestamp |
+        relative_timestamp(null) |
         .label |= "\($obj_prefix).lastscheduletime.\(.)"
       else
         empty
       end,
       (
         # Dummy metric to detect cron jobs without jobs
-        0 | relative_timestamp |
+        0 | relative_timestamp(null) |
         . + {
           "label": "\($obj_prefix).lastsuccess.completion.\(.label)",
           "selector": "max",
@@ -418,7 +458,7 @@ reduce .items[] as $obj ({};
 
           # Timing
           if $start_time_ts then
-            $start_time_ts | relative_timestamp |
+            $start_time_ts | relative_timestamp(null) |
             . + {
               "label": "start.\(.label)"
             }
@@ -426,7 +466,7 @@ reduce .items[] as $obj ({};
             empty
           end,
           if $completion_time_ts then
-            $completion_time_ts | relative_timestamp |
+            $completion_time_ts | relative_timestamp(null) |
             . + {
               "label": "completion.\(.label)"
             }
