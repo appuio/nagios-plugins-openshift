@@ -26,6 +26,9 @@ usage() {
     'expression are more than given value'
   echo ' -C regex=value Fail if performance metrics matching given regular'\
     'expression are more than given value'
+  echo ' -a name        Always output metrics with given name'
+  echo ' -A regex       Always output metrics matching given regular'\
+    'expression'
   echo
   echo 'Examples:'
   echo '  -c global.pod.count=900'
@@ -40,6 +43,29 @@ objfile="${tmpdir}/objects.json"
 metricsfile="${tmpdir}/metrics.sh"
 
 echo '{}' > "$limitfile"
+
+update_limitfile() {
+  jq --raw-output "${@}" <"$limitfile" >"${limitfile}.tmp" && \
+  mv "${limitfile}.tmp" "$limitfile"
+}
+
+add_static_metric() {
+  local key="$1" name="$2"
+  local args
+
+  if [[ -z "$name" ]]; then
+    usage >&2
+    exit "$state_unknown"
+  fi
+
+  args=(
+    --arg key "$key"
+    --arg name "$name"
+    '.static_metric[$key] += [$name]'
+  )
+
+  update_limitfile "${args[@]}"
+}
 
 add_limit() {
   local kind="$1" key="$2" arg="$3"
@@ -75,8 +101,7 @@ add_limit() {
       ;;
   esac
 
-  jq --raw-output "${args[@]}" <"$limitfile" >"${limitfile}.tmp" && \
-  mv "${limitfile}.tmp" "$limitfile"
+  update_limitfile "${args[@]}"
 }
 
 opt_verbose=
@@ -84,7 +109,7 @@ opt_cfgfile=
 opt_namespace=
 opt_reskind="$default_reskind"
 
-while getopts 'hvf:n:t:w:c:W:C:' opt; do
+while getopts 'hvf:n:t:w:c:W:C:a:A:' opt; do
   case "$opt" in
     h)
       usage
@@ -98,6 +123,8 @@ while getopts 'hvf:n:t:w:c:W:C:' opt; do
     c) add_limit plain crit "$OPTARG" ;;
     W) add_limit regex warn "$OPTARG" ;;
     C) add_limit regex crit "$OPTARG" ;;
+    a) add_static_metric plain "$OPTARG" ;;
+    A) add_static_metric regex "$OPTARG" ;;
     *)
       usage >&2
       exit "$state_unknown"
@@ -170,6 +197,28 @@ def find_limit($name; $type_key):
       $limit
     ) |
     first
+  )
+;
+
+# Determine whether to output a metric
+def determine_metric_output:
+  verbose or (
+    (
+      .status == $state_ok and
+      .warn == null and
+      .crit == null and
+      .msg == null
+    ) | not
+  ) or (
+    .name as $name |
+    $limits.static_metric? as $static_metric |
+    ($static_metric.plain? | index($name)) or
+    (
+      ($static_metric.regex? // []) | any(
+        . as $re |
+        $name | test($re; "gs")
+      )
+    )
   )
 ;
 
@@ -504,14 +553,7 @@ to_entries | map(
   else
     .status = $state_ok
   end |
-  .output = verbose or (
-    (
-      .status == $state_ok and
-      .warn == null and
-      .crit == null and
-      .msg == null
-    ) | not
-    )
+  .output = (. | determine_metric_output)
 ) as $perfdata_all |
 
 # Sort metrics for output by status and name
