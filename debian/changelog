@@ -1,3 +1,11 @@
+nagios-plugins-openshift (0.18.10) xenial; urgency=medium
+
+  check_openshift_object_stats:
+  * Add "-a" and "-A" options to always output metrics matching given names;
+    by default only metrics with limits are output in non-verbose mode.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Mon, 05 Aug 2019 14:49:48 +0200
+
 nagios-plugins-openshift (0.18.9) xenial; urgency=medium
 
   check_openshift_object_stats:

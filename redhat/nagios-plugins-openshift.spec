@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.18.9
+Version: 0.18.10
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -55,6 +55,11 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Mon Aug 5 2019 Michael Hanselmann <hansmi@vshn.ch> 0.18.10-1
+- check_openshift_object_stats:
+  - Add "-a" and "-A" options to always output metrics matching given names; by
+    default only metrics with limits are output in non-verbose mode.
+
 * Thu Jul 11 2019 Michael Hanselmann <hansmi@vshn.ch> 0.18.9-1
 - check_openshift_object_stats:
   - Fractions on the number of pods in a pending, running or other phase are
