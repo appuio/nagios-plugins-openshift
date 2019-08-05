@@ -217,6 +217,11 @@ def selector_key:
   .selector_key // error("Measurement \(.) is missing selector key")
 ;
 
+def format_metric:
+  "\u0027\(.name)\u0027=\(.value)\(.uom // "");\(.warn // "");\(.crit // "");\(.min // "");\(.max // "")" |
+  sub(";+$"; ""; "gs")
+;
+
 reduce .items[] as $obj ({};
   . as $state |
   ($obj | object_namespace) as $ns |
@@ -559,7 +564,7 @@ $perfdata | map(
       .min = 0
     ]
   ) |
-  map("\u0027\(.name)\u0027=\(.value)\(.uom // "");\(.warn // "");\(.crit // "");\(.min // "");\(.max // "")") |
+  map(. | format_metric) |
   join(if verbose then "\n" else " " end)
 ) as $fmtperfdata |
 
