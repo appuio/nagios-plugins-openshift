@@ -59,6 +59,7 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 - check_openshift_object_stats:
   - Add "-a" and "-A" options to always output metrics matching given names; by
     default only metrics with limits are output in non-verbose mode.
+  - Timestamps of object conditions are reported as individual statistics.
 
 * Thu Jul 11 2019 Michael Hanselmann <hansmi@vshn.ch> 0.18.9-1
 - check_openshift_object_stats:
