@@ -1,3 +1,11 @@
+nagios-plugins-openshift (0.18.11) xenial; urgency=medium
+
+  check_openshift_object_stats:
+  * Increase timeout for check command from 1 minute to 5 minutes. On larger
+    clusters the evaluation may take more than a minute.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Wed, 14 Aug 2019 15:49:21 +0200
+
 nagios-plugins-openshift (0.18.10) xenial; urgency=medium
 
   check_openshift_object_stats:
