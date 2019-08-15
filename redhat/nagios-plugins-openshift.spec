@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.18.10
+Version: 0.18.11
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -55,6 +55,11 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Wed Aug 14 2019 Michael Hanselmann <hansmi@vshn.ch> 0.18.11-1
+- check_openshift_object_stats:
+  - Increase timeout for check command from 1 minute to 5 minutes. On larger
+    clusters the evaluation may take more than a minute.
+
 * Mon Aug 5 2019 Michael Hanselmann <hansmi@vshn.ch> 0.18.10-1
 - check_openshift_object_stats:
   - Add "-a" and "-A" options to always output metrics matching given names; by
