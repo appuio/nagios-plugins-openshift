@@ -1,3 +1,14 @@
+nagios-plugins-openshift (0.18.12) xenial; urgency=medium
+
+  check_openshift_object_stats:
+  * Timestamps on object conditions, added in version 0.18.10, are removed
+    again. They produced a large number of metrics while not answering the
+    questions posed.
+  * New "running_after" metric on pods calculated for pods which are running
+    and which have no restarted containers.
+
+ -- Michael Hanselmann <hansmi@vshn.ch>  Fri, 16 Aug 2019 10:32:22 +0200
+
 nagios-plugins-openshift (0.18.11) xenial; urgency=medium
 
   check_openshift_object_stats:

@@ -238,7 +238,7 @@ def state_prefix:
   )]"
 ;
 
-def relative_timestamp($since_ts):
+def relative_timestamp:
   (
     {
       "label": "absolute",
@@ -258,32 +258,8 @@ def relative_timestamp($since_ts):
       else
         empty
       end
-    ),
-    (
-      # Emit only when timestamp is in the past
-      if $since_ts and $since_ts <= . then
-        {
-          "label": "after",
-          "value": (. - $since_ts) | floor,
-          "uom": "s",
-          "min": 0
-        }
-      else
-        empty
-      end
     )
   )
-;
-
-def condition_timestamp($create_ts; $time; $label_prefix):
-  ($time | parse_timestamp) as $ts |
-  if $ts then
-    $ts |
-    relative_timestamp($create_ts) |
-    .label |= "\($label_prefix).\(.)"
-  else
-    empty
-  end
 ;
 
 def selector_key:
@@ -341,7 +317,7 @@ reduce .items[] as $obj ({};
       ($obj.metadata.deletionTimestamp | parse_timestamp) as $deletion_ts |
       if $deletion_ts then
         $deletion_ts |
-        relative_timestamp($create_ts) |
+        relative_timestamp |
         .label |= "\($obj_prefix).deletion.\(.)"
       else
         empty
@@ -351,7 +327,7 @@ reduce .items[] as $obj ({};
     (
       if $create_ts then
         $create_ts |
-        relative_timestamp(null) |
+        relative_timestamp |
         (
           .label |= "creation.\(.)",
           if $kind == "pod" then
@@ -381,23 +357,37 @@ reduce .items[] as $obj ({};
       end
     ),
 
-    (
-      ($obj_status.conditions? // [])[] |
+    if $kind == "pod" then
       (
-        . as $condition |
-        (
-          condition_timestamp($create_ts; .lastProbeTime?; "lastprobe"),
-          condition_timestamp($create_ts; .lastTransitionTime?; "lasttransition")
-        ) |
-        (
-          .,
-          .label |= "status.\($condition.status | ascii_downcase).\(.)"
-        ) |
-        .label |= "\($obj_prefix).condition.\($condition.type | ascii_downcase).\(.)"
-      )
-    ),
+        ($obj_status.conditions? // []) | map(select(
+          (.type | ascii_downcase) == "podscheduled" and
+          (.status | ascii_downcase) == "true" and
+          .lastTransitionTime
+        )) |
+        first | .lastTransitionTime | parse_timestamp
+      ) as $scheduled_at |
+      ($obj_status.containerStatuses? // []) | map(
+        (.state.running.startedAt | parse_timestamp) as $started_at |
+        # As soon as at least one container has restarted it becomes impossible
+        # to determine how long the initial start of all containers took
+        if .restartCount == 0 and $started_at then
+          $started_at
+        else
+          # Container was not started the first time or is not running
+          null
+        end
+      ) as $container_started_at |
+      if $scheduled_at and ($container_started_at | length) > 0 and ($container_started_at | all) then
+        {
+          "label": "\($obj_prefix).running_after",
+          "uom": "s",
+          "value": ((($container_started_at | max) - $scheduled_at) | floor)
+        }
+      else
+        empty
+      end
 
-    if $kind == "cronjob" then
+    elif $kind == "cronjob" then
       $obj.spec? as $cronjob_spec |
       if $cronjob_spec then
         {
@@ -410,14 +400,14 @@ reduce .items[] as $obj ({};
       ($obj_status.lastScheduleTime? | parse_timestamp) as $last_schedule_time_ts |
       if $last_schedule_time_ts then
         $last_schedule_time_ts |
-        relative_timestamp(null) |
+        relative_timestamp |
         .label |= "\($obj_prefix).lastscheduletime.\(.)"
       else
         empty
       end,
       (
         # Dummy metric to detect cron jobs without jobs
-        0 | relative_timestamp(null) |
+        0 | relative_timestamp |
         . + {
           "label": "\($obj_prefix).lastsuccess.completion.\(.label)",
           "selector": "max",
@@ -458,7 +448,7 @@ reduce .items[] as $obj ({};
 
           # Timing
           if $start_time_ts then
-            $start_time_ts | relative_timestamp(null) |
+            $start_time_ts | relative_timestamp |
             . + {
               "label": "start.\(.label)"
             }
@@ -466,7 +456,7 @@ reduce .items[] as $obj ({};
             empty
           end,
           if $completion_time_ts then
-            $completion_time_ts | relative_timestamp(null) |
+            $completion_time_ts | relative_timestamp |
             . + {
               "label": "completion.\(.label)"
             }
