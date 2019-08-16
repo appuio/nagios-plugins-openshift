@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.18.11
+Version: 0.18.12
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -55,6 +55,14 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Fri Aug 16 2019 Michael Hanselmann <hansmi@vshn.ch> 0.18.12-1
+- check_openshift_object_stats:
+  - Timestamps on object conditions, added in version 0.18.10, are removed
+    again. They produced a large number of metrics while not answering the
+    questions posed.
+  - New "running_after" metric on pods calculated for pods which are running
+    and which have no restarted containers.
+
 * Wed Aug 14 2019 Michael Hanselmann <hansmi@vshn.ch> 0.18.11-1
 - check_openshift_object_stats:
   - Increase timeout for check command from 1 minute to 5 minutes. On larger

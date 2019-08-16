@@ -357,7 +357,37 @@ reduce .items[] as $obj ({};
       end
     ),
 
-    if $kind == "cronjob" then
+    if $kind == "pod" then
+      (
+        ($obj_status.conditions? // []) | map(select(
+          (.type | ascii_downcase) == "podscheduled" and
+          (.status | ascii_downcase) == "true" and
+          .lastTransitionTime
+        )) |
+        first | .lastTransitionTime | parse_timestamp
+      ) as $scheduled_at |
+      ($obj_status.containerStatuses? // []) | map(
+        (.state.running.startedAt | parse_timestamp) as $started_at |
+        # As soon as at least one container has restarted it becomes impossible
+        # to determine how long the initial start of all containers took
+        if .restartCount == 0 and $started_at then
+          $started_at
+        else
+          # Container was not started the first time or is not running
+          null
+        end
+      ) as $container_started_at |
+      if $scheduled_at and ($container_started_at | length) > 0 and ($container_started_at | all) then
+        {
+          "label": "\($obj_prefix).running_after",
+          "uom": "s",
+          "value": ((($container_started_at | max) - $scheduled_at) | floor)
+        }
+      else
+        empty
+      end
+
+    elif $kind == "cronjob" then
       $obj.spec? as $cronjob_spec |
       if $cronjob_spec then
         {
