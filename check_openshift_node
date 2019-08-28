@@ -7,7 +7,11 @@ set -e -u -o pipefail
 usage() {
   echo "Usage: $0 -f <path> -n <node>"
   echo
-  echo 'Check node conditions Ready and OutOfDisk.'
+  echo 'Check node conditions. Checked are:'
+  echo ' - Ready'
+  echo ' - DiskPressure'
+  echo ' - MemoryPressure'
+  echo ' - OutOfDisk'
   echo
   echo 'Options:'
   echo ' -f   Config file path'
@@ -86,6 +90,8 @@ check_condition() {
 
 # Important: Keep usage description synchronized with the list of conditions!
 check_condition Ready true
+check_condition DiskPressure false
+check_condition MemoryPressure false
 check_condition OutOfDisk false
 
 finish "$exit_status" \
