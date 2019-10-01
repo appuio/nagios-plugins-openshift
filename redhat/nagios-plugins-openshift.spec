@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.18.12
+Version: 0.18.13
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -55,6 +55,10 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Tue Oct 1 2019 Manuel Hutter <manuel@vshn.ch 0.18.13-1
+- check_openshift_node:
+  - Also check DiskPressure and MemoryPressure.
+
 * Fri Aug 16 2019 Michael Hanselmann <hansmi@vshn.ch> 0.18.12-1
 - check_openshift_object_stats:
   - Timestamps on object conditions, added in version 0.18.10, are removed
