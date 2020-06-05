@@ -8,6 +8,7 @@ usage() {
   echo "Usage: $0 -f <path> [-w <warn>] [-c <crit>]"
   echo '          [-l [<class>,]<label>=<value> [-w <warn>] [-c <crit>] ...]'
   echo '          [-s [<class>,]<capacity> [-w <warn>] [-c <crit>] ...]'
+  echo '          [-i [<class>]'
   echo
   echo 'Options:'
   echo ' -f   Config file path'
@@ -17,6 +18,7 @@ usage() {
   echo '      given are available'
   echo ' -l   Select using label, value and optional storage class.'
   echo ' -s   Select using volume capacity and optional storage class.'
+  echo ' -i   Ignore volumes of a storageclass.'
   echo
   echo 'Volumes selected using the "-l" or "-s" options are not considered for the'
   echo 'generic or later selection-specific limits. The first selector matching a'
@@ -41,6 +43,9 @@ usage() {
   echo '    Ignore volumes with a capacity of 100Gi (i.e. ignore them) unless they'
   echo '    have a label "foo" with value "bar". A warning is emitted if fewer than'
   echo '    7 volumes with label "foo" and value "bar" are available.'
+  echo " $0 -l foo=bar -w 7 -i baz"
+  echo '    Ignore volumes with storageclass "baz". All volumes with storageclass'
+  echo '    "bazz" will be ignored, regardless of other selectors.'
 }
 
 opt_cfgfile=
@@ -49,6 +54,7 @@ opt_label=
 opt_capacity=
 opt_warn=
 opt_crit=
+opt_ignore_storageclass=()
 
 limits=()
 default_limits=
@@ -111,7 +117,7 @@ reset_limit() {
   eval "${varname}=\"\$value\""
 }
 
-while getopts 'hf:w:c:l:s:' opt; do
+while getopts 'hf:w:c:l:s:i:' opt; do
   case "$opt" in
     h)
       usage
@@ -133,6 +139,9 @@ while getopts 'hf:w:c:l:s:' opt; do
     s)
       push_limit
       reset_limit opt_capacity "$OPTARG" validate_capacity
+      ;;
+    i)
+      opt_ignore_storageclass+=( "$OPTARG" )
       ;;
     *)
       usage >&2
@@ -218,6 +227,9 @@ filter_volumes() {
     # FIXME: Don't use string comparison to compare quantities
     jqfilter+=" | select(.spec.capacity.storage == \"$capacity\")"
   fi
+  for class in ${opt_ignore_storageclass[@]+"${opt_ignore_storageclass[@]}"}; do
+    jqfilter+=" | select(.spec.storageClassName != \"$class\")"
+  done
   jqfilter+=']'
 
   jq --raw-output \
