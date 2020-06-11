@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.18.14) xenial; urgency=medium
+
+  check_openshift_pv_avail:
+  * Add option to ignore entire storageclasses.
+
+ -- Sandro Kaspar <sandro.kaspar@vshn.ch>  Mon, 08 Jun 2020 15:32:00 +0200
+
 nagios-plugins-openshift (0.18.13) xenial; urgency=medium
 
   check_openshift_node:
