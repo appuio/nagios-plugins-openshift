@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.18.14
+Version: 0.18.15
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -55,6 +55,10 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Tue Aug 25 2020 Simon Gerber <simon.gerber@vshn.ch> 0.18.15-1
+- new-app-and-wait:
+  - Expose application over HTTPS in addtion to HTTP.
+
 * Mon Jun 8 2020 Sandro Kaspar <sandro.kaspar@vshn.ch> 0.18.14-1
 - check_openshift_pv_avail:
   - Add option to ignore entire storageclasses.
