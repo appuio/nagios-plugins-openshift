@@ -1,12 +1,12 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.18.14
+Version: 0.18.15
 Release: 1
 License: BSD-3-Clause
 Source: .
 URL: https://github.com/appuio/nagios-plugins-openshift
 Vendor: VSHN AG
-Packager: Michael Hanselmann <hansmi@vshn.ch>
+Packager: VSHN AG <info@vshn.ch>
 BuildRequires: python34-devel
 Requires: bash
 Requires: curl >= 7.21.3
@@ -55,6 +55,10 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Tue Aug 25 2020 Simon Gerber <simon.gerber@vshn.ch> 0.18.15-1
+- new-app-and-wait:
+  - Expose application over HTTPS in addtion to HTTP.
+
 * Mon Jun 8 2020 Sandro Kaspar <sandro.kaspar@vshn.ch> 0.18.14-1
 - check_openshift_pv_avail:
   - Add option to ignore entire storageclasses.

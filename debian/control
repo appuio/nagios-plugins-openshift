@@ -1,7 +1,7 @@
 Source: nagios-plugins-openshift
 Section: net
 Priority: optional
-Maintainer: Michael Hanselmann <hansmi@vshn.ch>
+Maintainer: VSHN AG <info@vshn.ch>
 Build-Depends: debhelper (>= 8.0.0),
  python3,
  python3-setuptools,

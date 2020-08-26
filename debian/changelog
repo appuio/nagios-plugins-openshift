@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.18.15) xenial; urgency=medium
+
+  new-app-and-wait:
+  - Expose application over HTTPS in addition to HTTP.
+
+ -- Simon Gerber <simon.gerber@vshn.ch>  Wed, 26 Aug 2020 11:35:50 +0200
+
 nagios-plugins-openshift (0.18.14) xenial; urgency=medium
 
   check_openshift_pv_avail:

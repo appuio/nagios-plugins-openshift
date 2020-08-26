@@ -147,6 +147,11 @@ def Check(client, args, timeout):
       })
 
   client.run(["expose", "svc", appname])
+  # This is required for some cases where a CDN is running in
+  # front of the cluster and the CDN only makes HTTPS connections to the
+  # backends. We always patch the route to be available over HTTP and HTTPS.
+  client.run(["patch", "route", appname, "-p",
+    '{"spec":{"tls":{"termination":"Edge","insecureEdgeTerminationPolicy":"Allow"}}}'])
 
   # Construct application URL
   route = client.capture_json(["get", "--output=json", "route", appname])
