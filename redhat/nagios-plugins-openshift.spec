@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.18.16
+Version: 0.18.17
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -55,6 +55,10 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Wed Aug 26 2020 Simon Gerber <simon.gerber@vshn.ch> 0.18.17-1
+- new-app-and-wait:
+  - Fix refactoring mistake in vshn_npo/iputils.py
+
 * Wed Aug 26 2020 Simon Gerber <simon.gerber@vshn.ch> 0.18.16-1
 - new-app-and-wait:
   - Follow HTTP redirects when checking application accessibility

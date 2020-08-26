@@ -28,11 +28,12 @@ class sockaddr_in6(ctypes.Structure):
 
 
 class ifaddrs(ctypes.Structure):
-    _fields_ = [('ifa_next', ctypes.POINTER(ifaddrs)),
-                ('ifa_name', ctypes.c_char_p),
-                ('ifa_flags', ctypes.c_uint),
-                ('ifa_addr', ctypes.POINTER(sockaddr)),
-                ('ifa_netmask', ctypes.POINTER(sockaddr))]
+    pass
+ifaddrs._fields_ = [('ifa_next', ctypes.POINTER(ifaddrs)),
+                    ('ifa_name', ctypes.c_char_p),
+                    ('ifa_flags', ctypes.c_uint),
+                    ('ifa_addr', ctypes.POINTER(sockaddr)),
+                    ('ifa_netmask', ctypes.POINTER(sockaddr))]
 
 
 libc = ctypes.CDLL(ctypes.util.find_library("socket" if os.uname()[0] == "SunOS" else "c"), use_errno=True)

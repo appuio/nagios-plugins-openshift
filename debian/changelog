@@ -1,3 +1,10 @@
+nagios-plugins-openshift (0.18.17) xenial; urgency=medium
+
+  new-app-and-wait:
+  * Fix refactoring mistake in vshn_npo/iputils.py
+
+ -- Simon Gerber <simon.gerber@vshn.ch>  Wed, 26 Aug 2020 16:20:13 +0200
+
 nagios-plugins-openshift (0.18.16) xenial; urgency=medium
 
   new-app-and-wait
