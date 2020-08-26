@@ -21,6 +21,7 @@ def capture_curl(url, options=None, curl_binary=constants.DEFAULT_CURL_BINARY):
   cmd = [
     curl_binary,
     "--verbose",
+    "--location",
     "--silent",
     "--show-error",
     "--fail",
