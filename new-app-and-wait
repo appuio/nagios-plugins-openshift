@@ -15,6 +15,7 @@ from vshn_npo import constants
 from vshn_npo import oc_client
 from vshn_npo import retry
 from vshn_npo import utils
+from vshn_npo import iputils
 
 
 def capture_curl(url, options=None, curl_binary=constants.DEFAULT_CURL_BINARY):
@@ -68,7 +69,14 @@ def check_url_anyip(url, pattern, timeout):
   logging.info("Resolving host \"%s\"", parsed_url.host)
   addrinfo = socket.getaddrinfo(parsed_url.host, port, type=socket.SOCK_STREAM)
 
+  host_has_global_ip6 = iputils.host_has_global_ip6()
+
   for (af, socktype, proto, _, sa) in addrinfo:
+    if af == socket.AF_INET6 and not host_has_global_ip6:
+      # Skip check over IPv6 if the host running the check doesn't have any
+      # global IPv6 addresses
+      continue
+
     if af == socket.AF_INET:
       (ipaddr, _) = sa
     elif af == socket.AF_INET6:
