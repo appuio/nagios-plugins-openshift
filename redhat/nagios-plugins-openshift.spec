@@ -1,6 +1,6 @@
 Summary: Monitoring scripts for OpenShift
 Name: nagios-plugins-openshift
-Version: 0.18.15
+Version: 0.18.16
 Release: 1
 License: BSD-3-Clause
 Source: .
@@ -55,6 +55,12 @@ make 'LIBDIR=%{_libdir}' 'DATADIR=%{_datadir}'
 %{_datadir}/icinga2/include/plugins-contrib.d/*.conf
 
 %changelog
+* Wed Aug 26 2020 Simon Gerber <simon.gerber@vshn.ch> 0.18.16-1
+- new-app-and-wait:
+  - Follow HTTP redirects when checking application accessibility
+  - Only check test application over IPv6 if the host running the check
+    actually has IPv6 connectivity.
+
 * Tue Aug 25 2020 Simon Gerber <simon.gerber@vshn.ch> 0.18.15-1
 - new-app-and-wait:
   - Expose application over HTTPS in addtion to HTTP.

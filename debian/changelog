@@ -1,3 +1,12 @@
+nagios-plugins-openshift (0.18.16) xenial; urgency=medium
+
+  new-app-and-wait
+  * Follow HTTP redirects when checking application accessibility
+  * Only check test application over IPv6 if the host running the check
+    actually has IPv6 connectivity.
+
+ -- Simon Gerber <simon.gerber@vshn.ch>  Wed, 26 Aug 2020 15:59:44 +0200
+
 nagios-plugins-openshift (0.18.15) xenial; urgency=medium
 
   new-app-and-wait:
