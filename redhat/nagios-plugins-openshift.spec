@@ -6,7 +6,7 @@ License: BSD-3-Clause
 Source: .
 URL: https://github.com/appuio/nagios-plugins-openshift
 Vendor: VSHN AG
-Packager: Michael Hanselmann <hansmi@vshn.ch>
+Packager: VSHN AG <info@vshn.ch>
 BuildRequires: python34-devel
 Requires: bash
 Requires: curl >= 7.21.3
